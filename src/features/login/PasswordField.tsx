@@ -50,8 +50,8 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
             autoComplete="current-password"
             className={
               invalid
-                ? 'w-full rounded-field border border-danger-600 bg-surface py-3 pl-11 pr-12 text-base text-ink-900 shadow-field placeholder:text-ink-400 read-only:bg-surface-sunken read-only:text-ink-500'
-                : 'w-full rounded-field border border-border bg-surface py-3 pl-11 pr-12 text-base text-ink-900 shadow-field placeholder:text-ink-400 read-only:bg-surface-sunken read-only:text-ink-500'
+                ? 'w-full rounded-field border border-danger-600 bg-surface py-[1.1rem] pl-11 pr-12 text-base text-ink-900 shadow-field placeholder:text-ink-400 read-only:bg-surface-sunken read-only:text-ink-500'
+                : 'w-full rounded-field border border-border bg-surface py-[1.1rem] pl-11 pr-12 text-base text-ink-900 shadow-field placeholder:text-ink-400 read-only:bg-surface-sunken read-only:text-ink-500'
             }
             value={value}
             readOnly={readOnly}

@@ -202,13 +202,30 @@ reach the browser. It is the browser's job not to show it.
 | `npm run format:check` | Prettier check |
 | `npm test` | Jest + React Testing Library |
 | `npm run test:coverage` | The same, with coverage thresholds enforced |
+| `npm run verify:cors-browser` | The two AC-16 cross-origin browser checks, against a running gateway |
 
 `tests/` mirrors `src/`. The security anchors run as a **named suite** in
 `tests/security/negativeAnchors.test.tsx`, not as incidental assertions.
 
+### The cross-origin checks
+
 `tests/gateway/corsConfiguration.test.ts` reads the four `ntrada*.yml` files from a
-sibling `hianshul100_Pacco.APIGateway` checkout. Where that checkout is absent the
-suite **skips explicitly** rather than passing silently.
+sibling gateway checkout, located via `$PACCO_GATEWAY_CONFIG_DIR` or a list of
+known sibling directory names (`tests/gateway/gatewayConfigDir.ts`). Where no
+checkout is found the suite **fails with the full search path** — and fails
+unconditionally when `CI` is set — so an absent checkout can never read as a
+discharged AC-15. The guard of record for AC-15 lives in the gateway repository
+itself, at `scripts/verify-cors-config.sh`, wired into its `scripts/test.sh`.
+
+`npm run verify:cors-browser` is the runtime half, AC-16: it drives headless
+Chromium from an allowed and a disallowed page origin against the gateway and
+reports what the browser's own CORS implementation decided. It exits **2 for
+NOT RUN** — distinct from 1 for failed — when Chromium or the gateway is
+unavailable, because `LOW_LEVEL_SPEC-13652-wave-1.md` §L.6.2 requires such a row
+to be reported as "not run" and never as passed.
+
+**AC-16 is currently not run: no Docker Compose stack is available here.** See
+[`docs/CORS_VERIFICATION.md`](docs/CORS_VERIFICATION.md) for the full record.
 
 ---
 
@@ -219,10 +236,17 @@ The sign-in screen is checked against `.attachments/02_login-page-ux.png`:
 ```bash
 npm run build
 npx vite preview --port 3000 --strictPort &
+# The window size is the reference image's own native size, so boxes in the
+# capture can be compared with boxes in the comp without rescaling.
 chromium --headless --no-sandbox --disable-dev-shm-usage --disable-gpu \
-  --screenshot=/tmp/login.png --window-size=1400,900 \
+  --screenshot=/tmp/login.png --window-size=1448,1086 \
   --virtual-time-budget=10000 http://localhost:3000/login
 ```
+
+Current measured agreement is **96.4%** (whole-page mean absolute pixel
+difference 9.14/255) against the 95% gate. The per-element measurements and the
+defects that were corrected to reach it are tabulated in
+[`docs/DESIGN_APPROXIMATION.md`](docs/DESIGN_APPROXIMATION.md) §4.
 
 Automated contrast checking is **not** covered by the jsdom accessibility suite:
 axe-core's `color-contrast` rule is disabled there because jsdom applies no

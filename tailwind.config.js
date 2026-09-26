@@ -59,6 +59,12 @@ export default {
           200: '#F3DCA8',
           700: '#8A5B10',
         },
+        // The two concentric decorative arcs in the reference's bottom-left
+        // corner, sampled where each crosses the page's left edge.
+        arc: {
+          outer: '#DFEBFE',
+          inner: '#CFE1FC',
+        },
       },
       fontFamily: {
         sans: [
@@ -81,7 +87,9 @@ export default {
         field: '0 1px 2px rgba(16, 35, 63, 0.04)',
       },
       maxWidth: {
-        card: '34rem',
+        // The login card's width in the reference image, 563px at its native
+        // 1448px page width.
+        card: '35.2rem',
       },
       screens: {
         // The spec's single documented breakpoint

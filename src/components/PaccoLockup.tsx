@@ -17,13 +17,15 @@ type LockupSize = 'sm' | 'md' | 'lg'
 const MARK_SIZE: Record<LockupSize, string> = {
   sm: 'h-7 w-auto',
   md: 'h-9 w-auto',
-  lg: 'h-14 w-auto',
+  // The card lockup in the reference stands 65px tall at its native 1448px
+  // page width.
+  lg: 'h-16 w-auto',
 }
 
 const WORDMARK_SIZE: Record<LockupSize, string> = {
   sm: 'h-5 w-auto',
   md: 'h-6 w-auto',
-  lg: 'h-9 w-auto',
+  lg: 'h-10 w-auto',
 }
 
 const LOCKUP_GAP: Record<LockupSize, string> = {

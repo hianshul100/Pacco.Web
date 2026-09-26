@@ -5,33 +5,40 @@
  * host and port, no `'*'` may remain, and `allowCredentials`,
  * `allowedMethods`, `allowedHeaders` and `exposedHeaders` must be unchanged.
  *
- * The gateway repository is a sibling checkout of this one. Where it is not
- * present the checks are skipped explicitly rather than passing silently.
+ * The gateway repository is a sibling checkout of this one; see
+ * `gatewayConfigDir.ts` for how it is located and why the guard of record lives
+ * in the gateway repository rather than here.
+ *
+ * ⚠️ Missing checkout: a previous revision flipped to `describe.skip` and then
+ * asserted `typeof available === 'boolean'`, a tautology that reported green
+ * while checking nothing. It now FAILS LOUDLY whenever `CI` is set, and locally
+ * still fails the availability test with the full search path, so an absent
+ * checkout can never read as a discharged AC-15.
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { DEV_SERVER_ORIGIN } from '@/config/devServerOrigin'
 
-const GATEWAY_CONFIG_DIR = join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  'hianshul100_Pacco.APIGateway',
-  'src',
-  'Pacco.APIGateway',
-)
+import {
+  CONFIG_FILES,
+  MISSING_CHECKOUT_MESSAGE,
+  isContinuousIntegration,
+  resolveGatewayConfigDir,
+} from './gatewayConfigDir'
 
-const CONFIG_FILES = [
-  'ntrada.yml',
-  'ntrada.docker.yml',
-  'ntrada-async.yml',
-  'ntrada-async.docker.yml',
-]
+const configDir = resolveGatewayConfigDir()
 
-const available = CONFIG_FILES.every((name) => existsSync(join(GATEWAY_CONFIG_DIR, name)))
-const describeGateway = available ? describe : describe.skip
+// In CI the assertions run unconditionally: with no checkout they throw on the
+// first read, which is exactly the loud failure a gate needs.
+const describeGateway = configDir !== null || isContinuousIntegration() ? describe : describe.skip
+
+function readConfig(name: string): string {
+  if (configDir === null) {
+    throw new Error(MISSING_CHECKOUT_MESSAGE)
+  }
+  return readFileSync(join(configDir, name), 'utf8')
+}
 
 /**
  * Extracts the `extensions.cors` block verbatim, preserving bytes. The block
@@ -41,7 +48,7 @@ const describeGateway = available ? describe : describe.skip
  * between the plain and `.docker` variants.
  */
 function corsBlock(name: string): string {
-  const content = readFileSync(join(GATEWAY_CONFIG_DIR, name), 'utf8')
+  const content = readConfig(name)
   const start = content.indexOf('  cors:')
   expect(start).toBeGreaterThan(-1)
   const rest = content.slice(start + '  cors:'.length)
@@ -105,7 +112,7 @@ describeGateway('gateway CORS configuration', () => {
   it.each(CONFIG_FILES)(
     '%s adds no logout or revoke route and changes no auth flag on the sign-in route',
     (name) => {
-      const content = readFileSync(join(GATEWAY_CONFIG_DIR, name), 'utf8')
+      const content = readConfig(name)
       expect(content).not.toMatch(/upstream:\s*\/?(logout|sign-out|revoke)/i)
       expect(content).not.toMatch(/revoke-(access|refresh)-token/i)
     },
@@ -113,8 +120,15 @@ describeGateway('gateway CORS configuration', () => {
 })
 
 describe('gateway configuration availability', () => {
-  it('reports plainly when the gateway checkout is not present beside this repository', () => {
-    // A skipped edge check must be visible, not silent.
-    expect(typeof available).toBe('boolean')
+  it('locates the four ntrada*.yml files, or fails with the full search path', () => {
+    // A skipped edge check must be visible and must not read as a pass. The
+    // failure carries the whole search path, so the reason is actionable rather
+    // than "suite skipped".
+    if (configDir === null) {
+      throw new Error(MISSING_CHECKOUT_MESSAGE)
+    }
+    expect(CONFIG_FILES.map((name) => existsSync(join(configDir, name)))).toEqual(
+      CONFIG_FILES.map(() => true),
+    )
   })
 })

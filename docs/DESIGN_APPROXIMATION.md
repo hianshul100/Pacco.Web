@@ -65,7 +65,49 @@ the full height of the artwork, so no single rectangular crop can keep the cube 
 the wordmark while excluding the strapline. `PaccoLockup` therefore composes the two
 crops side by side at a fixed ratio. Both crops are real exported pixels.
 
-## 4. What must happen when the approved assets arrive
+## 4. Measured fidelity against `02_login-page-ux.png`
+
+Review measured the first cut of `/login` at ~93% against the reference, below
+the 95% gate, and named the defects. The layout was re-derived by rendering
+`/login` in headless Chromium at the reference's own native **1448 × 1086** and
+measuring element boxes against the same boxes in the reference image.
+
+| Reported defect | Cause | Fix |
+| --- | --- | --- |
+| Card ~63px right of page centre | the two rails were flex children of **unequal** widths (`max-w-xs` against `max-w-[12rem]`), so the card was centred in what was left over | the middle row is now a grid, `minmax(0,1fr) minmax(0,35.2rem) minmax(0,1fr)`. The rail tracks are equal whatever their content, so the card column sits on the page's own centre line |
+| Right rail vertically centred, overlapping the plant | `md:items-center` on the row | the row is `md:items-start` and each rail carries its measured top inset (`md:pt-[8.6rem]` left, `md:pt-[8.2rem]` right), aligning them to the card's upper third as the reference does. `md:pl-[8rem]` on the right rail clears the backdrop's plant |
+| Left headline too large and ~130px too low | `text-5xl` inside a centred rail | `text-[2.5rem]`, and the top inset above places it where the reference puts it |
+| Card ~14% too short | field, button and card padding all under-scaled | card `sm:py-[3.6rem]`, form `mt-6 gap-8`, fields `py-[1.1rem]`, button `py-[1.2rem]`, card lockup `h-16` |
+| "Need help?" semibold and too small | `font-semibold text-sm` | `text-base`, regular weight |
+| Backdrop washed out, arcs too large and low-contrast | `opacity-[0.28]`, a single horizontal mask, and hand-guessed arc sizes | backdrop `opacity-[0.55]` with an intersected horizontal **and** vertical mask, because the reference fades the photo out on both axes. The arcs were re-fitted from where each crosses the page's left and bottom edges |
+| Brand lockup slightly small | — | mark `h-14` → `h-16`, wordmark `h-9` → `h-10` |
+
+Measured after the refit, at 1448 × 1086, against the reference:
+
+| Feature | Reference | Rendered |
+| --- | --- | --- |
+| Card box | x444–1006, y144–881 (h738) | x442–1005, y146–883 (h737) |
+| Card lockup | y202–266 | y203–266 |
+| Identifier field | y445–505 | y444–502 |
+| Password field | y590–651 | y589–648 |
+| Primary button | y711–772, w460 | y708–769, w460 |
+| Left headline | x82–302, y289–331 | x79–307, y289–328 |
+| Right rail first item | x1164 | x1166 |
+| Outer arc, left-edge crossing | y677 | y678 |
+| Inner arc, left-edge crossing | y811 | y809 |
+| Inner / outer arc, bottom-edge crossing | x336 / x447 | x336 / x445 |
+
+Whole-page mean absolute pixel difference is **9.14 / 255**, i.e. **96.4%**,
+above the 95% gate. The residual is concentrated in the right-hand band
+(mean 14.8) where the comp's own photographic content — plant position, window
+mullion, curtain fall — differs from the supplied `04_backgroud-img.png`; that
+is a difference between two source photographs, not a layout error.
+
+**This does not make the foundation approved.** A high pixel score against a
+raster comp says the comp was matched. It says nothing about token names, ramp
+steps, or the states the comp does not show. §1's blocker **B3** still stands.
+
+## 5. What must happen when the approved assets arrive
 
 1. Replace the ramps in `tailwind.config.js` with the values from
    `pacco-material-you.css`.

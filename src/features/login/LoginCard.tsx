@@ -68,7 +68,7 @@ export function LoginCard(props: LoginCardProps) {
   return (
     <section
       aria-labelledby="login-heading"
-      className="w-full max-w-card rounded-card bg-surface px-6 py-8 shadow-card sm:px-12 sm:py-11"
+      className="w-full max-w-card rounded-card bg-surface px-6 py-8 shadow-card sm:px-[3.25rem] sm:py-[3.6rem]"
     >
       {/* Reference: the lockup is centred; the heading block beneath it is
           left-aligned to the field column. */}
@@ -87,12 +87,12 @@ export function LoginCard(props: LoginCardProps) {
         another: the status region is always above the alert region and both are
         always mounted (§L.3 item 5 step 29).
       */}
-      <div className="mt-6 flex flex-col gap-3">
+      <div className="mt-4 flex flex-col gap-3">
         <SessionNotice reason={noticeReason} />
         <FormMessage ref={messageRef} id={FORM_MESSAGE_ID} message={message} />
       </div>
 
-      <form className="mt-5 flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+      <form className="mt-6 flex flex-col gap-8" onSubmit={handleSubmit} noValidate>
         <IdentifierField
           ref={identifierRef}
           id={IDENTIFIER_ID}
@@ -125,8 +125,8 @@ export function LoginCard(props: LoginCardProps) {
           aria-disabled={submitting}
           className={
             submitting
-              ? 'w-full cursor-not-allowed rounded-field bg-brand-300 px-4 py-3.5 text-base font-semibold text-white'
-              : 'w-full rounded-field bg-brand-600 px-4 py-3.5 text-base font-semibold text-white hover:bg-brand-700'
+              ? 'w-full cursor-not-allowed rounded-field bg-brand-300 px-4 py-[1.2rem] text-base font-semibold text-white'
+              : 'w-full rounded-field bg-brand-600 px-4 py-[1.2rem] text-base font-semibold text-white hover:bg-brand-700'
           }
         >
           {submitting ? LOGIN_COPY.submitProcessing : LOGIN_COPY.submit}
@@ -134,7 +134,7 @@ export function LoginCard(props: LoginCardProps) {
 
         <a
           href="#login-heading"
-          className="self-center text-sm font-semibold text-brand-600 hover:text-brand-700"
+          className="self-center text-base text-brand-600 hover:text-brand-700"
         >
           {LOGIN_COPY.needHelp}
         </a>

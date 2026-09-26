@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,tsx}\"",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "verify:cors-browser": "node scripts/cors-browser-check.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",
