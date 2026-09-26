@@ -80,6 +80,14 @@ CORS contract in step 3, so it must not move on its own.
 > dev server that refuses to start. `5173` is Vite's default, is published by no
 > file in `Pacco/compose`, and is outside the `5000`–`5009` service block that
 > ADR-021 §6.3 item 1 keeps this client out of.
+>
+> That reasoning is automated, not just written down. `tests/compose/devServerPort.test.ts`
+> parses the host ports every `Pacco/compose/*.yml` actually publishes and fails
+> if `DEV_SERVER_ORIGIN` names one of them or falls inside `5000`–`5009`, so a
+> service added to Compose later is covered without anyone updating a list by
+> hand. The same test holds the gateway guard's transcribed port list
+> (`Pacco.APIGateway/scripts/verify-cors-config.sh`, `COMPOSE_HOST_PORTS`) against
+> those files — it is the only place both repositories are visible at once.
 
 Open `http://localhost:5173/login`.
 
