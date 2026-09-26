@@ -44,7 +44,7 @@ for a pass.
 $ npm run verify:cors-browser
 AC-16 / FR-11 cross-origin browser checks
   gateway           http://localhost:5000
-  allowed origin    http://localhost:3000     (expect ACCEPTED)
+  allowed origin    http://localhost:5173     (expect ACCEPTED)
   disallowed origin http://localhost:3999  (expect REJECTED)
 
   chromium          chromium
@@ -70,7 +70,7 @@ Stand-in that echoes **only** the exact allowed origin — the behaviour the
 patched `ntrada*.yml` should produce:
 
 ```
-  check 1  http://localhost:3000 -> ACCEPTED status=400
+  check 1  http://localhost:5173 -> ACCEPTED status=400
   check 2  http://localhost:3999 -> REJECTED Failed to fetch
 
   AC-16 PASSED: both cross-origin browser checks behaved as specified.
@@ -81,7 +81,7 @@ Stand-in that echoes **any** origin — the over-broad behaviour this change
 removes:
 
 ```
-  check 1  http://localhost:3000 -> ACCEPTED status=400
+  check 1  http://localhost:5173 -> ACCEPTED status=400
   check 2  http://localhost:3999 -> ACCEPTED status=400
 
   check 2 FAILED: the non-allowlisted origin http://localhost:3999 was ACCEPTED

@@ -17,6 +17,11 @@ import { DEV_SERVER_ORIGIN } from './src/config/devServerOrigin'
  * local origin -- scheme, host and port, for example `http://localhost:3000`,
  * matching whichever port Pacco.Web actually serves"). If Vite were allowed to
  * fall back to another port the allowed origin would silently stop matching.
+ *
+ * The port itself is NOT 3000 -- that is the ADR's example, and 3000 is taken by
+ * Grafana in the Compose backend this client is required to run beside. See
+ * `src/config/devServerOrigin.ts` for the full reasoning; the constant there is
+ * the single source of truth and is the only place the value is written.
  */
 export const DEV_SERVER_PORT = Number(new URL(DEV_SERVER_ORIGIN).port)
 

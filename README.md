@@ -67,11 +67,21 @@ npm install
 npm run dev
 ```
 
-It serves on **`http://localhost:3000`**, pinned with `strictPort: true` so it will
+It serves on **`http://localhost:5173`**, pinned with `strictPort: true` so it will
 fail loudly rather than silently drift to another port — the port is half of the
 CORS contract in step 3, so it must not move on its own.
 
-Open `http://localhost:3000/login`.
+> **Why 5173 and not the `3000` ADR-021 §5 rule 4 uses as its example?** Because
+> `3000` is the example ("matching whichever port `Pacco.Web` actually serves"),
+> and the backend already holds it: `Pacco/compose/infrastructure.yml:34`
+> publishes host port `3000` for Grafana, and that is the file step 1's runbook
+> starts. ADR-021 §4 requires this client to run *beside* the Compose backend, so
+> a port the backend publishes is not a choice — with `strictPort: true` it is a
+> dev server that refuses to start. `5173` is Vite's default, is published by no
+> file in `Pacco/compose`, and is outside the `5000`–`5009` service block that
+> ADR-021 §6.3 item 1 keeps this client out of.
+
+Open `http://localhost:5173/login`.
 
 ### 3. Align the gateway's CORS origin with that port
 
@@ -90,7 +100,7 @@ Each now reads:
   cors:
     allowCredentials: true
     allowedOrigins:
-      - 'http://localhost:3000'
+      - 'http://localhost:5173'
 ```
 
 The wildcard `'*'` is gone, and `allowCredentials: true` is retained — a wildcard
@@ -113,7 +123,7 @@ docker-compose -f services-local.yml up -d --build api-gateway
 
 ### 5. Verify
 
-1. Load `http://localhost:3000/login`.
+1. Load `http://localhost:5173/login`.
 2. Submit valid credentials. The browser navigates to `/welcome` and the session
    appears in `sessionStorage` under the key `pacco.session`. **`/welcome` renders
    nothing in this wave** — the post-sign-in screen is wave-2 — so an intentionally
@@ -123,7 +133,7 @@ docker-compose -f services-local.yml up -d --build api-gateway
 4. Stop the gateway and submit again. The screen should show *"Sign-in is
    temporarily unavailable. Please try again."*
 5. In DevTools → Network, confirm the preflight `OPTIONS` and the `POST` both return
-   `Access-Control-Allow-Origin: http://localhost:3000` (not `*`).
+   `Access-Control-Allow-Origin: http://localhost:5173` (not `*`).
 
 ---
 
@@ -194,9 +204,9 @@ reach the browser. It is the browser's job not to show it.
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Vite dev server on `http://localhost:3000` |
+| `npm run dev` | Vite dev server on `http://localhost:5173` |
 | `npm run build` | `tsc -b` then `vite build` |
-| `npm run preview` | Serves `dist/` on `http://localhost:3000` |
+| `npm run preview` | Serves `dist/` on `http://localhost:5173` |
 | `npm run typecheck` | `tsc -b --force` |
 | `npm run lint` | ESLint over the whole repository |
 | `npm run format:check` | Prettier check |
