@@ -203,6 +203,7 @@ reach the browser. It is the browser's job not to show it.
 | `npm test` | Jest + React Testing Library |
 | `npm run test:coverage` | The same, with coverage thresholds enforced |
 | `npm run verify:cors-browser` | The two AC-16 cross-origin browser checks, against a running gateway |
+| `npm run verify:visual` | Measures the rendered `/login` against its committed design reference |
 
 `tests/` mirrors `src/`. The security anchors run as a **named suite** in
 `tests/security/negativeAnchors.test.tsx`, not as incidental assertions.
@@ -231,22 +232,39 @@ to be reported as "not run" and never as passed.
 
 ## Visual verification
 
-The sign-in screen is checked against `.attachments/02_login-page-ux.png`:
+⚠️ **There is no Figma file for this capability.** `LOW_LEVEL_SPEC-13652-wave-1.md`
+§L.12.1 and `SPECIFICATION.md` §11.1 both record that no Figma file, URL or node id
+exists for `13652`; the design source is the static images supplied with the ticket.
+The two this wave consumed are **committed** to
+[`docs/design-reference/`](docs/design-reference/README.md), so the screen can be
+compared with its reference from a checkout alone rather than from a path outside
+the repository.
+
+The check is a command, not a procedure:
 
 ```bash
 npm run build
-npx vite preview --port 3000 --strictPort &
-# The window size is the reference image's own native size, so boxes in the
-# capture can be compared with boxes in the comp without rescaling.
-chromium --headless --no-sandbox --disable-dev-shm-usage --disable-gpu \
-  --screenshot=/tmp/login.png --window-size=1448,1086 \
-  --virtual-time-budget=10000 http://localhost:3000/login
+npm run verify:visual
 ```
 
-Current measured agreement is **96.4%** (whole-page mean absolute pixel
-difference 9.14/255) against the 95% gate. The per-element measurements and the
-defects that were corrected to reach it are tabulated in
-[`docs/DESIGN_APPROXIMATION.md`](docs/DESIGN_APPROXIMATION.md) §4.
+[`scripts/visual-fidelity-check.mjs`](scripts/visual-fidelity-check.mjs) serves
+`dist/`, screenshots `/login` in headless Chromium at the reference image's own
+native 1448 × 1086 — so boxes in the capture compare with boxes in the comp
+without rescaling — and measures the mean absolute per-channel difference inside
+the browser. Like the cross-origin checks it exits **2 for NOT RUN**, distinct from
+1 for failed, when Chromium is missing or `dist/` has not been built.
+
+Last measured: **96.4%** whole-page agreement (mean |Δ| 9.14/255) against the 95%
+gate. The band breakdown puts the residual in the right-hand quarter (93.2%), where
+the comp's own photographic content — plant position, window mullion, curtain fall —
+differs from the supplied background image; the three layout bands measure 96.9% to
+97.9%. Per-element measurements and the defects corrected to reach this are
+tabulated in [`docs/DESIGN_APPROXIMATION.md`](docs/DESIGN_APPROXIMATION.md) §4.
+
+🚫 The Welcome screen (`03_welcome-page-ux.png`) is **not** rendered by this
+repository yet and so is not measured here: `/welcome`, its top bar, its role
+message and its logout control are wave-2's, per
+`LOW_LEVEL_SPEC-13652-wave-2.md` §L.2.2.
 
 Automated contrast checking is **not** covered by the jsdom accessibility suite:
 axe-core's `color-contrast` rule is disabled there because jsdom applies no

@@ -13,7 +13,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,tsx}\"",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "verify:cors-browser": "node scripts/cors-browser-check.mjs"
+    "verify:cors-browser": "node scripts/cors-browser-check.mjs",
+    "verify:visual": "node scripts/visual-fidelity-check.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",

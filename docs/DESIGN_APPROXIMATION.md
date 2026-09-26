@@ -18,15 +18,21 @@ blocker recorded as **B3**.
 
 What *was* supplied are four raster images:
 
-| File | Size | What it is |
-| --- | --- | --- |
-| `01_pacco-logo-1.png` | 1672 × 941 | The Pacco logo lockup on a white field |
-| `02_login-page-ux.png` | 1448 × 1086 | The sign-in screen visual reference |
-| `03_welcome-page-ux.png` | 1448 × 1086 | The post-sign-in screen — **wave-2, not built here** |
-| `04_backgroud-img.png` | 1448 × 1086 | The office background photograph |
+| File | Size | What it is | In this repository |
+| --- | --- | --- | --- |
+| `01_pacco-logo-1.png` | 1672 × 941 | The Pacco logo lockup on a white field | ✅ `docs/design-reference/01_pacco-logo-1.png` |
+| `02_login-page-ux.png` | 1448 × 1086 | The sign-in screen visual reference | ✅ `docs/design-reference/02_login-page-ux.png` |
+| `03_welcome-page-ux.png` | 1448 × 1086 | The post-sign-in screen — **wave-2, not built here** | 🚫 Not committed; it belongs with the wave that builds `/welcome` |
+| `04_backgroud-img.png` | 1448 × 1086 | The office background photograph | ✅ `src/assets/office-background.png`, byte-identical — a shipped asset, not only a reference |
 
 A raster comp carries pixels. It does not carry token names, ramp steps, spacing
 scales, type scales, motion, or states the comp does not happen to show.
+
+⚠️ **And there is no Figma file behind them.** `LOW_LEVEL_SPEC-13652-wave-1.md`
+§L.12.1 and `SPECIFICATION.md` §11.1 both record that no Figma file, URL or node
+id exists for capability `13652`. These images are not a fallback for a design
+system that was not fetched — they are the whole design source of record. See
+[`design-reference/README.md`](design-reference/README.md).
 
 ## 2. What was therefore done
 
@@ -48,7 +54,9 @@ scales, type scales, motion, or states the comp does not happen to show.
 ## 3. Asset provenance
 
 Cropping a supplied export is not redrawing it: every pixel below comes from the
-file named in the "Derived from" column.
+file named in the "Derived from" column. Those source files are now committed
+under [`design-reference/`](design-reference/README.md), so each crop can be
+re-derived and checked rather than taken on trust.
 
 | Asset in this repo | Size | Derived from | Operation |
 | --- | --- | --- | --- |
@@ -99,9 +107,29 @@ Measured after the refit, at 1448 × 1086, against the reference:
 
 Whole-page mean absolute pixel difference is **9.14 / 255**, i.e. **96.4%**,
 above the 95% gate. The residual is concentrated in the right-hand band
-(mean 14.8) where the comp's own photographic content — plant position, window
-mullion, curtain fall — differs from the supplied `04_backgroud-img.png`; that
-is a difference between two source photographs, not a layout error.
+(mean 17.25, i.e. 93.2%) where the comp's own photographic content — plant
+position, window mullion, curtain fall — differs from the supplied
+`04_backgroud-img.png`; that is a difference between two source photographs, not
+a layout error. The three layout bands measure 97.6%, 96.9% and 97.9%.
+
+### Reproducing that number
+
+The figures above were originally measured by hand, which made them unverifiable
+by a reviewer — the defect review raised. They are now produced by a committed
+command against a committed reference:
+
+```bash
+npm run build
+npm run verify:visual
+```
+
+[`../scripts/visual-fidelity-check.mjs`](../scripts/visual-fidelity-check.mjs)
+renders `/login` at the reference's own 1448 × 1086, compares the two images
+channel by channel, prints the whole-page figure and the four-band breakdown, and
+exits non-zero below the 95% gate — so a visual regression fails a command rather
+than going unnoticed. It exits **2 for NOT RUN** where Chromium is unavailable or
+`dist/` has not been built; an unexecuted check is never reported as passed
+(`LOW_LEVEL_SPEC-13652-wave-1.md` §L.6.2).
 
 **This does not make the foundation approved.** A high pixel score against a
 raster comp says the comp was matched. It says nothing about token names, ramp
@@ -112,7 +140,7 @@ steps, or the states the comp does not show. §1's blocker **B3** still stands.
 1. Replace the ramps in `tailwind.config.js` with the values from
    `pacco-material-you.css`.
 2. Delete the approximation banners from `tailwind.config.js` and `src/index.css`.
-3. Re-run the screenshot comparison in `README.md` §"Visual verification".
+3. Re-run `npm run verify:visual` and update §4 with what it reports.
 4. Delete this file.
 
 Until then, treat every token here as provisional.
