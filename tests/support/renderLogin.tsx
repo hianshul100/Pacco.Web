@@ -3,7 +3,6 @@ import type { RenderResult } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 
-import { BrandFrame } from '@/components/BrandFrame'
 import { Router } from '@/Router'
 import type { GatewayClient } from '@/gateway/gatewayClient'
 
@@ -20,9 +19,7 @@ export interface RenderLoginOptions {
 export function renderLogin({ client, initialEntry = '/login' }: RenderLoginOptions): RenderResult {
   return render(
     <MemoryRouter initialEntries={[initialEntry as never]}>
-      <BrandFrame>
-        <Router client={client} />
-      </BrandFrame>
+      <Router client={client} />
     </MemoryRouter>,
   )
 }

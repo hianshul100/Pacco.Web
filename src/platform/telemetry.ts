@@ -1,6 +1,7 @@
 /**
  * Telemetry -- the six `login.*` events of
- * LOW_LEVEL_SPEC-13652-wave-1.md §L.3 item 9.
+ * LOW_LEVEL_SPEC-13652-wave-1.md §L.3 item 9, and the four `landing.*` events
+ * of LOW_LEVEL_SPEC-13652-wave-2.md §L.3 item 9.
  *
  * 🚫 No event carries an identifier value, a password, a token, a role, or the
  * backend `reason` string. The payload types below make that structural rather
@@ -31,7 +32,30 @@ export type LoginTelemetryEvent =
       readonly classification: string
     }
 
-export type TelemetrySink = (event: LoginTelemetryEvent) => void
+/**
+ * The four `landing.*` events of LOW_LEVEL_SPEC-13652-wave-2.md §L.3 item 9.
+ *
+ * 🚫 `landing.viewed` carries the DECISION, never the input. `presentation` is
+ * the closed two-value outcome and `roleRecognised` is a boolean; there is no
+ * field the raw role string could occupy, so NEG-7 ("no raw role value reaches
+ * telemetry") holds structurally rather than by review.
+ *
+ * The other three carry the route and nothing else -- no session, no token, no
+ * expiry, no reason string from a backend.
+ */
+export type LandingTelemetryEvent =
+  | {
+      readonly name: 'landing.viewed'
+      readonly presentation: 'admin' | 'standard'
+      readonly roleRecognised: boolean
+    }
+  | { readonly name: 'landing.blocked_unauthenticated'; readonly route: string }
+  | { readonly name: 'landing.session_expired'; readonly route: string }
+  | { readonly name: 'landing.logout'; readonly route: string }
+
+export type TelemetryEvent = LoginTelemetryEvent | LandingTelemetryEvent
+
+export type TelemetrySink = (event: TelemetryEvent) => void
 
 let sink: TelemetrySink | null = null
 
@@ -40,7 +64,7 @@ export function setTelemetrySink(next: TelemetrySink | null): void {
   sink = next
 }
 
-export function emit(event: LoginTelemetryEvent): void {
+export function emit(event: TelemetryEvent): void {
   if (sink === null) {
     return
   }

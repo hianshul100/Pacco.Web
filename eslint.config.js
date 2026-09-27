@@ -37,4 +37,12 @@ export default tseslint.config(
     files: ['vite.config.ts', 'jest.config.cjs', '*.config.js'],
     languageOptions: { globals: { ...globals.node } },
   },
+  {
+    // Test helpers are never served by the dev server, so Fast Refresh has no
+    // opinion about them: a render helper that also exports a session seeder is
+    // the point of the file, not a mistake.
+    files: ['tests/**/*.{ts,tsx}'],
+    languageOptions: { globals: { ...globals.node } },
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 )

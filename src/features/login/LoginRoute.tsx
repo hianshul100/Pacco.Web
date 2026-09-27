@@ -19,16 +19,16 @@ import type { SessionNoticeReason } from '@/features/login/SessionNotice'
 import { useSignIn } from '@/features/login/useSignIn'
 import type { GatewayClient } from '@/gateway/gatewayClient'
 import { Telemetry } from '@/platform/telemetry'
+import { WELCOME_PATH } from '@/routes'
 
 /**
  * The route the client navigates to on success.
  *
- * ⚠️ Wave-1 seam. The landing screen itself, its session guard and its
- * role-aware rendering are explicitly out of scope here
- * (LOW_LEVEL_SPEC-13652-wave-1.md §L.2.3), so no route is registered for this
- * path yet and the centre of the shell is empty when it resolves.
+ * Derived from the route table so the destination and the registered path
+ * cannot drift apart. The landing screen it resolves to is registered behind
+ * `RequireSession` (LOW_LEVEL_SPEC-13652-wave-2.md §L.3 item 5).
  */
-export const POST_SIGN_IN_PATH = '/welcome'
+export const POST_SIGN_IN_PATH = WELCOME_PATH
 
 /** The closed set of redirect reason keys. A reason is a KEY, never a message. */
 function readNoticeReason(state: unknown): SessionNoticeReason | null {

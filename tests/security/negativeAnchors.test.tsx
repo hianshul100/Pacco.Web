@@ -3,7 +3,6 @@
  * LOW_LEVEL_SPEC-13652-wave-1.md §L.6.A.4, run as a NAMED SUITE rather than as
  * incidental assertions (§L.6.A.4: "NEG-1 to NEG-7 above run as a named suite").
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { screen, waitFor } from '@testing-library/react'
@@ -11,7 +10,7 @@ import userEvent from '@testing-library/user-event'
 
 import { LOGIN_COPY } from '@/features/login/copy'
 import type { GatewayResponse } from '@/gateway/gatewayClient'
-import type { LoginTelemetryEvent } from '@/platform/telemetry'
+import type { TelemetryEvent } from '@/platform/telemetry'
 import { Telemetry } from '@/platform/telemetry'
 import { MESSAGE_REGISTRY } from '@/session/messageRegistry'
 import { SessionStore } from '@/session/sessionStore'
@@ -24,25 +23,7 @@ import {
   transportFailure,
 } from '../support/factories'
 import { renderLogin } from '../support/renderLogin'
-
-const SRC_ROOT = join(__dirname, '..', '..', 'src')
-
-function sourceFiles(directory: string = SRC_ROOT): string[] {
-  return readdirSync(directory).flatMap((entry: string) => {
-    const path = join(directory, entry)
-    if (statSync(path).isDirectory()) {
-      return sourceFiles(path)
-    }
-    return /\.tsx?$/.test(entry) ? [path] : []
-  })
-}
-
-/** Source with comments stripped, so prose about a rule is not mistaken for code. */
-function codeOf(path: string): string {
-  return readFileSync(path, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/.*$/gm, '$1')
-}
+import { SRC_ROOT, codeOf, sourceFiles } from '../support/sourceScan'
 
 const PASSWORD = 'Correct-Horse-Battery-9'
 const IDENTIFIER = 'someone@pacco.io'
@@ -104,7 +85,7 @@ describe('NEG-1 no backend text escapes', () => {
     'renders only the registry string for %s and leaks nothing to the DOM, console or telemetry',
     async (_label, response, expected) => {
       const user = userEvent.setup()
-      const events: LoginTelemetryEvent[] = []
+      const events: TelemetryEvent[] = []
       Telemetry.setTelemetrySink((event) => events.push(event))
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
       const error = jest.spyOn(console, 'error').mockImplementation(() => {})
@@ -133,7 +114,7 @@ describe('NEG-2 no password value escapes', () => {
     'keeps the submitted password out of telemetry, storage, the URL and every log line for %s',
     async (_label, response, expected) => {
       const user = userEvent.setup()
-      const events: LoginTelemetryEvent[] = []
+      const events: TelemetryEvent[] = []
       Telemetry.setTelemetrySink((event) => events.push(event))
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
 
@@ -153,7 +134,7 @@ describe('NEG-2 no password value escapes', () => {
 
   it('keeps the password out of every surface on the success path too', async () => {
     const user = userEvent.setup()
-    const events: LoginTelemetryEvent[] = []
+    const events: TelemetryEvent[] = []
     Telemetry.setTelemetrySink((event) => events.push(event))
 
     renderLogin({ client: recordingClient([okResponse(authDto())]) })
@@ -218,7 +199,7 @@ describe('NEG-5 no refresh token retained', () => {
   it('leaves the refresh token out of every storage key, the session object and every telemetry payload', async () => {
     const user = userEvent.setup()
     const refreshToken = 'RT-must-never-be-retained-0123456789'
-    const events: LoginTelemetryEvent[] = []
+    const events: TelemetryEvent[] = []
     Telemetry.setTelemetrySink((event) => events.push(event))
 
     const { container } = renderLogin({

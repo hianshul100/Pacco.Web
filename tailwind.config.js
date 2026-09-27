@@ -9,6 +9,11 @@
  * fabricated stand-in for the approved foundation and must be replaced when the
  * real assets are supplied. See docs/DESIGN_APPROXIMATION.md.
  *
+ * LOW_LEVEL_SPEC-13652-wave-2.md §L.12.5 repeats the blocker for the landing
+ * screen and requires it to INHERIT these values rather than start a second
+ * approximation. The landing screen therefore adds three tokens -- a chip
+ * surface, a heading tracking and a card width -- and changes none.
+ *
  * Only semantic names are exposed to components; no component uses a raw hex.
  */
 /** @type {import('tailwindcss').Config} */
@@ -43,6 +48,11 @@ export default {
           DEFAULT: '#FFFFFF',
           muted: '#F7FAFE',
           sunken: '#EEF4FC',
+          // The landing screen's role chip, sampled from
+          // `03_welcome-page-ux.png`. It sits between `brand.50` and
+          // `brand.100`, so it is named for its role rather than forced onto
+          // either rung of the ramp.
+          chip: '#E6EEFD',
         },
         border: {
           DEFAULT: '#DCE4EF',
@@ -86,10 +96,20 @@ export default {
         card: '0 24px 60px -24px rgba(16, 35, 63, 0.22), 0 2px 8px rgba(16, 35, 63, 0.05)',
         field: '0 1px 2px rgba(16, 35, 63, 0.04)',
       },
+      letterSpacing: {
+        // The landing heading is set tighter than any Tailwind step. The comp's
+        // display face is not one of the families the app can ship, so the
+        // tracking is what brings the rendered line to the comp's own measure
+        // (478px at the native 1448px page width) rather than a taste choice.
+        'landing-heading': '-0.068em',
+      },
       maxWidth: {
         // The login card's width in the reference image, 563px at its native
         // 1448px page width.
         card: '35.2rem',
+        // The landing card is wider: 642px at the same native page width in
+        // `03_welcome-page-ux.png`.
+        'landing-card': '40.125rem',
       },
       screens: {
         // The spec's single documented breakpoint

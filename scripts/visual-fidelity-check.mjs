@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * Visual fidelity check — `/login` against its committed design reference.
+ * Visual fidelity check — a route against its committed design reference.
+ *
+ * Defaults to `/login` against `02_login-page-ux.png`; `--route`,
+ * `--reference` and `--seed` point the same measurement at another screen.
  *
  * Review of the delivery raised that the visual result was **unverified**: the
  * agreement figure in `docs/DESIGN_APPROXIMATION.md` §4 was produced by hand,
@@ -39,6 +42,8 @@
  * Usage:
  *   npm run build
  *   node scripts/visual-fidelity-check.mjs [--keep]
+ *   node scripts/visual-fidelity-check.mjs --route=/welcome \
+ *        --reference=03_welcome-page-ux.png --seed=admin
  *
  * Environment overrides:
  *   CHROMIUM_BIN        explicit path to a Chromium/Chrome binary
@@ -55,14 +60,40 @@ import { fileURLToPath } from 'node:url'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST_DIR = join(REPO_ROOT, 'dist')
-const REFERENCE = join(REPO_ROOT, 'docs', 'design-reference', '02_login-page-ux.png')
+const REFERENCE_DIR = join(REPO_ROOT, 'docs', 'design-reference')
+const DEFAULT_REFERENCE = join(REPO_ROOT, 'docs', 'design-reference', '02_login-page-ux.png')
 
 const EXIT_PASS = 0
 const EXIT_FAIL = 1
 const EXIT_NOT_RUN = 2
 
-/** The route under test, and the reference that fixes its layout. */
-const ROUTE = '/login'
+/** Reads `--name=value` from the command line. */
+function option(name) {
+  const prefix = `--${name}=`
+  const found = process.argv.find((argument) => argument.startsWith(prefix))
+  return found === undefined ? null : found.slice(prefix.length)
+}
+
+/**
+ * The route under test, and the reference that fixes its layout. Both default
+ * to `/login`, so `npm run verify:visual` is unchanged; `--route` and
+ * `--reference` point the same measurement at another screen.
+ */
+const ROUTE = option('route') ?? '/login'
+const REFERENCE_NAME = option('reference')
+const REFERENCE = REFERENCE_NAME === null ? DEFAULT_REFERENCE : join(REFERENCE_DIR, REFERENCE_NAME)
+
+/**
+ * A protected route redirects to sign-in unless the browser already holds a
+ * live session, so there would be nothing to measure. `--seed=<role>` asks the
+ * local server to plant one in `sessionStorage` before the bundle boots.
+ *
+ * ⚠️ The planted token is a STRUCTURE, not a credential: three base64url
+ * segments with a far-future `exp` and a meaningless signature. It is
+ * unusable against the gateway, which verifies the signature, and no real
+ * credential is committed anywhere (SPECIFICATION.md AC-7).
+ */
+const SEED_ROLE = option('seed')
 
 /** Vertical bands, reported separately so a residual can be located. */
 const BAND_COUNT = 4
@@ -112,6 +143,24 @@ function pngSize(path) {
   return { width: header.readUInt32BE(16), height: header.readUInt32BE(20) }
 }
 
+/** A structurally valid but unsigned token whose `exp` is far in the future. */
+function seedScript(role) {
+  const segment = (value) =>
+    Buffer.from(JSON.stringify(value), 'utf8')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+  const expiresAt = Math.floor(Date.now() / 1000) + 3600
+  const token = [
+    segment({ alg: 'RS256', typ: 'JWT' }),
+    segment({ exp: expiresAt, sub: 'visual-fidelity-check' }),
+    'not-a-real-signature',
+  ].join('.')
+  const record = JSON.stringify({ accessToken: token, role, expiresAt, expiresRaw: expiresAt })
+  return `<script>sessionStorage.setItem('pacco.session', ${JSON.stringify(record)})</script>`
+}
+
 /** Serves `dist/`, plus the two images and the comparison page, from one origin. */
 function startServer(capturePath) {
   const extras = new Map([
@@ -146,6 +195,14 @@ function startServer(capturePath) {
       // is a single-page application and `/login` exists only in its router.
       const file = isFile ? candidate : join(DIST_DIR, 'index.html')
       response.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' })
+
+      // The seed is injected into the document head so it runs BEFORE the
+      // module bundle, which is what makes the session visible to the guard on
+      // its very first decision.
+      if (SEED_ROLE !== null && file.endsWith('index.html')) {
+        response.end(readFileSync(file, 'utf8').replace('<head>', `<head>${seedScript(SEED_ROLE)}`))
+        return
+      }
       response.end(readFileSync(file))
     })
 
@@ -301,10 +358,13 @@ async function main() {
   const workDir = mkdtempSync(join(tmpdir(), 'pacco-visual-'))
   const capturePath = join(workDir, 'capture.png')
 
-  console.log('Visual fidelity check — /login against its committed reference')
-  console.log(`  reference : docs/design-reference/02_login-page-ux.png (${width}×${height})`)
+  console.log(`Visual fidelity check — ${ROUTE} against its committed reference`)
+  console.log(`  reference : ${REFERENCE.slice(REPO_ROOT.length + 1)} (${width}×${height})`)
   console.log(`  chromium  : ${binary}`)
   console.log(`  gate      : ${GATE}% whole-page agreement`)
+  if (SEED_ROLE !== null) {
+    console.log(`  session   : seeded with role "${SEED_ROLE}" so the guard admits the route`)
+  }
   console.log('')
 
   const server = await startServer(capturePath)
