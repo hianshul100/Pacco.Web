@@ -1,0 +1,35 @@
+# ---------------------------------------------------------------------------
+# Suite-local ignore rules. Scoped to this directory so the host repository's
+# own .gitignore is left untouched.
+# ---------------------------------------------------------------------------
+
+# Secrets and local configuration -------------------------------------------
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+
+# Dependencies and build output ---------------------------------------------
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Playwright artefacts -------------------------------------------------------
+reports/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+.auth/
+
+# Editor and OS --------------------------------------------------------------
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
