@@ -2247,7 +2247,99 @@ Automation hint: enforce this with an architecture test that counts imports of t
 5. Zero writes originate outside the sign-in submission, so nothing after sign-in can create, replace or mutate the stored session.";The session can be written from exactly one place, reachable only by a parsed and accepted successful sign-in, so no later screen can create or alter a session.;1. None — read-only test.;Pacco Login and Role-Aware Landing;Blocker;pacco-web-session;API;Automatable;Security Testing;Security;Regression;"AC-8, AC-12
 Given the client source, when every write of the session is reviewed, then exactly one call site exists and it sits in the branch reached only by a parsed successful sign-in response.";"Requirement IDs: AC-8, AC-12, FR-7, FR-8, DO1, DO2, N3
 Jira: 13652";Valid
-REVIEW-NOTES;Self-review summary;"BLOCK A — ACCEPTANCE CRITERIA COVERAGE (28 criteria, 115 test cases)
+TC-13652-116;Verify that the six sign-in events fire at their documented points with documented payloads;The sign-in screen reports what it did through a fixed set of six analytics events, and the people who watch those events can only trust them if each one fires once, at its own moment, carrying its own agreed fields. This test drives one run that touches every one of the six points and inspects the captured payloads key by key. An event that is missing, fires twice, or quietly grows an extra field makes the sign-in signal unreadable and can turn the analytics store into a leak.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. Every analytics payload is being captured with its event name and its payload keys.
+3. The sign-in endpoint can be intercepted to hold a response and to return a rejected credential.";"Identifier = jane.smith@pacco.example.com
+Password = Sp1ng-Tide-4417
+Wrong password = WrongPass-0001
+Expected event set = screen viewed (route only), validation blocked (booleans naming which fields were empty), submission started (correlation identifier), duplicate suppressed (the in-flight correlation identifier), sign-in succeeded (correlation identifier), sign-in failed (correlation identifier and a bounded outcome label)
+Bounded outcome labels = invalid_credentials, unavailable, malformed, unexpected
+Response hold = 1500 milliseconds on the successful attempt
+
+Automation hint: assert the event name, the firing point and the exact payload key set for each of the six events; the duplicate-suppressed payload must carry the same correlation identifier as the submission still in flight, and the success payload must carry no token, no role and no field value.";"1. Start capturing analytics events and open http://localhost:5173/login.
+2. Activate Sign in with both fields empty.
+3. Enter jane.smith@pacco.example.com and Sp1ng-Tide-4417, activate Sign in against a response held for 1500 milliseconds, and activate Sign in four more times while it is in flight.
+4. Wait for the held response to settle, then log out and submit the same address with the password WrongPass-0001.
+5. List every captured event with its payload keys.
+6. Search every captured payload for the password, the submitted address, either token and the platform error text.";"1. Exactly one screen-viewed event is captured, carrying the route and nothing else.
+2. Exactly one validation-blocked event is captured, carrying only boolean flags naming which fields were empty; no typed value is present.
+3. Exactly one submission-started event is captured carrying a correlation identifier, and exactly four duplicate-suppressed events are captured, each carrying that same correlation identifier.
+4. Exactly one sign-in-succeeded event is captured carrying only the correlation identifier, and exactly one sign-in-failed event is captured carrying the correlation identifier and the bounded label invalid_credentials.
+5. Six distinct event names are present, each payload holds only its documented keys, and no payload holds an unexpected field.
+6. Zero payloads contain the password, the submitted address, either token or the platform error text.";All six sign-in events fire once each at their own point and every payload holds exactly its documented keys and nothing more.;"1. Clear browser storage and flush the capture harness.
+2. Remove the response hold and the interception rules.";Pacco Login and Role-Aware Landing;Medium;pacco-web-platform;UI;Automatable;Functional Testing;Functional;Regression;"AC-14
+Given a full sign-in run, when every analytics event is captured, then each of the six events fires at its own point with only its documented payload keys and no credential, token or platform error text.";"Requirement IDs: AC-14, FR-10, DO1, N8
+Jira: 13652
+Implicit: the measurement-only observation row in the wave-1 low-level test plan, which requires a run that records the six sign-in events firing at their execution points with the correct payload shape";Valid
+TC-13652-117;Verify that the sign-in round-trip time is recorded as a measurement without a threshold;Nobody has yet agreed how fast a Pacco sign-in has to be, so this test times the round trip and writes the number into the run report instead of judging it. It signs in five times and records each elapsed time and the median. Without a recorded baseline no owner can ever set a sensible limit later, and inventing one here would turn an unowned guess into a release gate.;"1. The Pacco backend stack is running through Docker Compose and the gateway answers on http://localhost:5000.
+2. The Pacco browser client is running locally at http://localhost:5173.
+3. A valid ordinary-user account exists with a known password.
+4. The run report can carry recorded measurements.";"Identifier = jane.smith@pacco.example.com
+Password = Sp1ng-Tide-4417
+Measurement = elapsed milliseconds from the Sign in activation until the welcome heading is readable
+Repetitions = 5 consecutive sign-in and logout runs
+Agreed limit = none; no upper bound is asserted anywhere in this test
+
+Automation hint: record each run elapsed milliseconds and the median into the run report; the only assertion is that a positive numeric measurement was captured for every run, never that it fell under a limit.";"1. Start the backend stack through Docker Compose and confirm the gateway answers on http://localhost:5000.
+2. Open http://localhost:5173/login, sign in with valid credentials, and time from the Sign in activation until the welcome heading is readable.
+3. Log out and repeat the timed sign-in four more times.
+4. Read the five recorded measurements and their median from the run report.
+5. Review the run report for any assertion against a time limit.";"1. The gateway answers and the Login screen loads.
+2. The first run reaches the welcome heading and one positive elapsed time in milliseconds is recorded.
+3. Four further runs complete and each records its own positive elapsed time in milliseconds.
+4. Five measurements and their median are present in the run report, all numeric and greater than zero.
+5. No step asserts an upper bound, and the run is reported as a recorded measurement rather than as a pass or fail against a time limit.";Five sign-in round-trip times and their median are recorded for a future limit to be set against, with no time limit asserted anywhere in the run.;"1. Log out and clear browser storage.
+2. Attach the five recorded measurements and the median to the run report.";Pacco Login and Role-Aware Landing;Low;pacco-web-platform;UI;Automatable;Performance Testing;Performance;Regression;"AC-8
+Given valid credentials, when the sign-in round trip completes, then its elapsed time is recorded as a measurement and no time limit is asserted against it.";"Requirement IDs: AC-8, FR-7, DO1, N8
+Jira: 13652
+Implicit: the measurement-only observation row in the wave-1 low-level test plan. No latency or availability target is agreed anywhere in the inputs, and this test deliberately invents none";Valid
+TC-13652-118;Verify that the four landing events fire once each with their documented payloads;The landing screen reports four things and only four: that it rendered, that it turned an unauthenticated visitor away, that it found a session past its expiry, and that the user logged out. This test drives all four points in one session and inspects what each event carried. A missing event leaves the role outcome unmonitored, and an over-generous payload puts the raw role value or the token into the analytics store for every sign-in.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. Every analytics payload is being captured with its event name and its payload keys.
+3. An administrator account and an ordinary-user account exist and can be signed in through the real Login screen.
+4. A session whose expiry has already passed can be established.";"Administrator identifier = alex.morgan@pacco.example.com
+Ordinary identifier = jane.smith@pacco.example.com
+Password = Sp1ng-Tide-4417
+Permitted landing-viewed payload keys = a presentation word, either admin or standard, and a boolean recording whether the role was recognised
+Permitted blocked, expired and logout payload keys = the route only
+Run sequence = administrator landing view, logout, direct landing request with no session, landing request with an expired session
+
+Automation hint: assert the landing-viewed payload holds exactly two keys with the presentation word admin for the administrator session and standard for the ordinary one; assert the logout, blocked and expired payloads each hold the route only and carry no role, token or identifier.";"1. Start capturing analytics events, sign in as alex.morgan@pacco.example.com and let the landing screen render.
+2. Read the landing-viewed event and its payload keys.
+3. Activate Logout and read the event captured on the way back to the Login screen.
+4. Request http://localhost:5173/welcome directly with no session and read the event captured.
+5. Establish a session whose expiry has already passed, request http://localhost:5173/welcome and read the event captured.
+6. Sign in as jane.smith@pacco.example.com and read the landing-viewed payload again.";"1. The landing screen renders with the heading ""Welcome to Admin Area"" and exactly one landing-viewed event is captured.
+2. The payload holds exactly two keys: the presentation word admin, and a boolean recording the role as recognised; no raw role string, token or identifier is present.
+3. Exactly one logout event is captured, carrying the route only, with no role, token or identifier.
+4. Exactly one blocked event is captured carrying the route only, and no part of the landing screen renders.
+5. Exactly one session-expired event is captured carrying the route only, and it is a distinct event name from the blocked one.
+6. The landing-viewed payload again holds exactly two keys, this time with the presentation word standard and the role recorded as recognised.";Each of the four landing events fires exactly once at its own point and carries only its documented keys, never a raw role value, a token or an identifier.;"1. Log out, clear browser storage and flush the capture harness.
+2. Remove the planted expired session.";Pacco Login and Role-Aware Landing;Medium;pacco-web-platform;UI;Automatable;Functional Testing;Functional;Regression;"AC-18, AC-20, AC-21, AC-22
+Given a session that renders, is turned away, expires and is logged out, when every analytics event is captured, then each of the four landing events fires once with only its documented payload keys and no raw role value.";"Requirement IDs: AC-18, AC-20, AC-21, AC-22, FR-10, FR-12, DO2
+Jira: 13652
+Implicit: the observability observation row in the wave-2 low-level test plan, which requires a run recording that the four landing events fired with the correct payload shape including the recognised-role boolean";Valid
+TC-13652-119;Verify that repeated failed sign-ins are never throttled, delayed or locked out;A user who mistypes their password several times in a row must simply be able to try again, because the platform that checks credentials keeps no failed-attempt count and holds no lockout timer. This test makes six consecutive wrong-password attempts back to back and then one correct attempt. If a lockout or a backoff ever appeared upstream, users would be shut out by a behaviour this screen has no message for and would only see the ordinary incorrect-credentials text.;"1. The Pacco backend stack is running through Docker Compose and the gateway answers on http://localhost:5000.
+2. The Pacco browser client is running locally at http://localhost:5173.
+3. A valid ordinary-user account exists with a known password.
+4. No proxy, firewall or test harness between the browser and the gateway applies its own rate limiting.";"Identifier = jane.smith@pacco.example.com
+Correct password = Sp1ng-Tide-4417
+Wrong passwords = WrongPass-0001, WrongPass-0002, WrongPass-0003, WrongPass-0004, WrongPass-0005, WrongPass-0006 — one per attempt
+Expected message on every rejected attempt = ""The email or password you entered is incorrect.""
+Attempt spacing = back to back, with no deliberate wait between submissions
+
+Automation hint: assert the identical message string after each of the six rejections, assert no attempt is answered with a wait, cooldown or lockout instruction, and assert the seventh submission with the correct password reaches the landing screen.";"1. Open http://localhost:5173/login and submit jane.smith@pacco.example.com with the password WrongPass-0001.
+2. Submit five more times back to back, using WrongPass-0002 through WrongPass-0006.
+3. Read the message shown after the sixth rejection and the state of the Sign in control.
+4. Submit the same address with the correct password Sp1ng-Tide-4417.
+5. Read the landing screen heading.";"1. The message reads exactly ""The email or password you entered is incorrect."" and the Sign in control is re-enabled.
+2. Each of the five further attempts is sent and rejected; none is refused before it is sent, held back, or answered differently from the first.
+3. The sixth rejection shows the same message word for word, with no lockout notice, no wait instruction and no cooldown; the Sign in control is enabled and both fields are editable.
+4. The submission is accepted with no additional delay.
+5. The heading reads exactly ""Welcome"" and the user is signed in; no attempt counter stood in the way.";Six consecutive rejections produce the identical message with no lockout, cooldown or backoff, and the next correct submission signs the user in.;1. Log out and clear browser storage.;Pacco Login and Role-Aware Landing;Medium;pacco-web-login;UI;Automatable;Regression Testing;Functional;Regression;"AC-9, AC-13
+Given six consecutive rejected sign-in attempts, when a seventh attempt carries the correct password, then every rejection showed the same message with no lockout or delay and the seventh attempt succeeds.";"Requirement IDs: AC-9, AC-13, FR-8, FR-9, DO1
+Jira: 13652
+Implicit: the platform catalogue records that the sign-in service keeps no failed-attempt tracking and no lockout counter, so no throttle exists for this screen to surface and none may appear";Valid
+REVIEW-NOTES;Self-review summary;"BLOCK A — ACCEPTANCE CRITERIA COVERAGE (28 criteria, 119 test cases)
 
 | Acceptance Criterion | Verdict | Test Cases | Notes |
 | --- | --- | --- | --- |
@@ -2258,21 +2350,21 @@ REVIEW-NOTES;Self-review summary;"BLOCK A — ACCEPTANCE CRITERIA COVERAGE (28 c
 | AC-5 submit lock released on network failure | Full | TC-016, TC-034, TC-039 | — |
 | AC-6 only the gateway address is contacted, source scan for stray hosts | Full | TC-018, TC-019, TC-020, TC-082, TC-100, TC-104, TC-105 | — |
 | AC-7 secret scan clean, no pre-filled fields | Full | TC-007, TC-021, TC-022 | — |
-| AC-8 session holds token, lower-cased role, token-derived expiry, user on landing | Full | TC-019, TC-023, TC-024, TC-025, TC-026, TC-027, TC-075, TC-082, TC-106, TC-115 | — |
-| AC-9 credential rejection shows the fixed message, no reason or status leaks | Full | TC-028, TC-032, TC-038, TC-077, TC-098 | — |
+| AC-8 session holds token, lower-cased role, token-derived expiry, user on landing | Full | TC-019, TC-023, TC-024, TC-025, TC-026, TC-027, TC-075, TC-082, TC-106, TC-115, TC-117 | — |
+| AC-9 credential rejection shows the fixed message, no reason or status leaks | Full | TC-028, TC-032, TC-038, TC-077, TC-098, TC-119 | — |
 | AC-10 unrecognised address gives the same message, no echo | Full | TC-029, TC-078 | — |
 | AC-11 unreachable or failing platform gives the availability message, no session | Full | TC-033, TC-034, TC-035, TC-039, TC-081 | — |
 | AC-12 malformed success gives the generic message, no session, stays on login | Full | TC-030, TC-031, TC-036, TC-037, TC-040, TC-098, TC-115 | — |
-| AC-13 identifier retained, password cleared, retry succeeds without reload | Full | TC-041, TC-077 | — |
-| AC-14 password absent from console, storage and telemetry | Full | TC-042, TC-043, TC-096, TC-099 | — |
+| AC-13 identifier retained, password cleared, retry succeeds without reload | Full | TC-041, TC-077, TC-119 | — |
+| AC-14 password absent from console, storage and telemetry | Full | TC-042, TC-043, TC-096, TC-099, TC-116 | — |
 | AC-15 four gateway files byte-identical, exactly one concrete origin | Full | TC-044 | — |
 | AC-16 allowed origin accepted, other origin rejected | Full | TC-045, TC-046, TC-100 | — |
 | AC-17 role admin in any case gives the administrator heading | Full | TC-047, TC-048, TC-049, TC-056, TC-076, TC-084, TC-106 | — |
-| AC-18 user, empty, whitespace, absent, administrator, superuser give the plain heading | Full | TC-026, TC-050, TC-051, TC-052, TC-053, TC-054, TC-055, TC-056, TC-057, TC-075, TC-084, TC-097, TC-114 | — |
+| AC-18 user, empty, whitespace, absent, administrator, superuser give the plain heading | Full | TC-026, TC-050, TC-051, TC-052, TC-053, TC-054, TC-055, TC-056, TC-057, TC-075, TC-084, TC-097, TC-114, TC-118 | — |
 | AC-19 admin-prefixed address with an ordinary role gives the plain heading | Full | TC-058, TC-059, TC-114 | — |
-| AC-20 no session redirects and the landing screen never renders | Full | TC-060, TC-061, TC-062, TC-084, TC-106, TC-107, TC-113 | — |
-| AC-21 expired session discarded, returned to login with a distinct notice | Full | TC-064, TC-065, TC-074, TC-089, TC-112, TC-113 | — |
-| AC-22 logout issues zero requests, store empty, token absent, user on login | Full | TC-066, TC-083, TC-084, TC-088 | — |
+| AC-20 no session redirects and the landing screen never renders | Full | TC-060, TC-061, TC-062, TC-084, TC-106, TC-107, TC-113, TC-118 | — |
+| AC-21 expired session discarded, returned to login with a distinct notice | Full | TC-064, TC-065, TC-074, TC-089, TC-112, TC-113, TC-118 | — |
+| AC-22 logout issues zero requests, store empty, token absent, user on login | Full | TC-066, TC-083, TC-084, TC-088, TC-118 | — |
 | AC-23 back after logout lands on login | Full | TC-067, TC-068 | — |
 | AC-24 the only changed gateway key is the allowed-origin list | Full | TC-069, TC-101 | — |
 | AC-25 machine caller with no origin header still succeeds | Full | TC-070, TC-102, TC-103 | — |
@@ -2283,7 +2375,7 @@ REVIEW-NOTES;Self-review summary;"BLOCK A — ACCEPTANCE CRITERIA COVERAGE (28 c
 Result: 28 of 28 criteria fully covered, 0 partial, 0 uncovered.
 
 BLOCK B — COVERAGE TRIGGER VERDICTS
-T-1 enumerated UI fields — FIRED — TC-002, TC-003, TC-004, TC-005, TC-006, TC-008, TC-009, TC-010
+T-1 enumerated UI fields and enumerated event registries — FIRED — TC-002, TC-003, TC-004, TC-005, TC-006, TC-008, TC-009, TC-010 for the named screen elements; TC-116 for the six named sign-in events and TC-118 for the four named landing events, each asserted per event rather than bundled into one telemetry check
 T-2 multiple named failure outcomes — FIRED — TC-028, TC-029, TC-030, TC-031, TC-032, TC-033, TC-034, TC-035, TC-036, TC-037, TC-098
 T-3 threshold and boundary values — FIRED — TC-035 request timeout boundary, TC-065 session expiry one second either side and exactly at the instant, TC-093 layout breakpoint at 767, 768 and 769 pixels
 T-4 design tokens and visual fidelity — NOT APPLICABLE — the approved style guide and stylesheet were never available in any repository, so no exact colour, radius, spacing or type value is specified anywhere in the inputs and there is nothing to assert against. What can be checked is covered by TC-090 measured contrast and TC-111 manual comparison against the reference image.
@@ -2291,7 +2383,7 @@ T-5 multi-step user journey — FIRED — TC-075, TC-076, TC-082, TC-084, TC-106
 T-6 asynchronous event publication — FIRED — TC-103, which confirms the existing sign-in notification still flows unchanged and that this capability introduces no message of its own and consumes none.
 T-7 data flowing across module boundaries — FIRED — TC-023, TC-027, TC-082, TC-106
 T-8 responsive and multi-viewport rendering — FIRED — TC-091 at 320 pixels, TC-092 at 390 by 844, TC-093 at 768 by 1024, TC-094 at 1280 and 1920, TC-095 at double magnification
-T-9 rate limiting and performance targets — NOT APPLICABLE — the inputs define no rate limit on the sign-in route, and they state explicitly that no latency or availability target has been agreed for this capability and that none is to be invented. No performance test case was generated. The only timing-related observation that does exist is recorded in TC-035 as a functional timeout boundary.
+T-9 rate limiting and performance targets — NOT APPLICABLE AS A GATE — the inputs define no rate limit on the sign-in route and state explicitly that no latency or availability target has been agreed and that none is to be invented, so no threshold is asserted anywhere in this bundle. What the inputs do require is recorded instead: TC-117 captures the sign-in round-trip time as a measurement so a limit can be attached once an owner sets one, and TC-119 confirms repeated failed attempts meet no throttle or lockout. TC-035 remains the client-side request timeout as a functional boundary.
 T-10 free-text input from an untrusted source — FIRED — TC-098 script, oversized, Unicode and control-character payloads, TC-014 whitespace-only input, TC-114 a role value planted in the address bar and in a second storage key
 T-11 token and session security edges — FIRED, BOUNDED — TC-037 unusable token, TC-065 expiry boundary and unreadable expiry, TC-073 observation past expiry, TC-074 no path back from an expired session, TC-083 post-logout replay measurement, TC-113 a session that dies while the protected screen is open, TC-115 the single authenticated write path into the session. Tampered-signature and cross-tenant probes were deliberately not generated: this client calls no protected route, and the platform's token validation behaviour is explicitly unchanged by this work, which TC-101 regression-anchors.
 T-12 cross-origin policy — FIRED — TC-044, TC-045, TC-046, TC-069, TC-070, TC-100
@@ -2303,4 +2395,4 @@ T-17 form usability — FIRED — TC-017, TC-041, TC-108, TC-109, TC-110
 T-18 regulated or personally identifying data — NOT APPLICABLE — no health, financial or otherwise regulated data class is named anywhere in the inputs. The only sensitive values this capability handles are the user's password and access token, whose confidentiality is covered by TC-010, TC-042, TC-096 and TC-099.
 
 BLOCK C — ASSUMPTIONS AND LIMITATIONS
-The client origin is pinned to http://localhost:5173; no port was fixed in the inputs and port 3000 is already taken by existing infrastructure. All four gateway configuration files now carry that same origin, so the allowed-origin cases are executable as written. Session expiry comes from the token's own claim; the response's expiry field has an unverified unit. No performance case exists: no latency or availability target was agreed and none was invented. TC-083 records the post-logout token replay as an accepted-risk measurement; its expected result is acceptance and it must never gate a pipeline. TC-111 and TC-112 are manual because the approved style assets were never supplied. No Dev, QA, Staging or Production frontend environment exists yet.";;;;;;;;;;;;;;;;;
+The client origin is pinned to http://localhost:5173; no port was fixed in the inputs and port 3000 is already taken by existing infrastructure. All four gateway configuration files now carry that same origin, so the allowed-origin cases are executable as written. Session expiry comes from the token's own claim; the response's expiry field has an unverified unit. No performance case exists: no latency or availability target was agreed and none was invented. TC-083 records the post-logout token replay as an accepted-risk measurement; its expected result is acceptance and it must never gate a pipeline. TC-111 and TC-112 are manual because the approved style assets were never supplied. TC-117 is tagged as a performance case only because the inputs require a recorded timing; it asserts no limit and must never gate a pipeline. TC-116 and TC-118 assert the analytics payloads against an allow-list of keys, so a newly added field fails by default. TC-119 rests on the platform catalogue recording no failed-attempt tracking and no lockout counter. No Dev, QA, Staging or Production frontend environment exists yet.";;;;;;;;;;;;;;;;;
