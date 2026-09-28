@@ -22,6 +22,7 @@ const REFERENCE_DIR = join(REPO_ROOT, 'docs', 'design-reference')
 const EXPECTED = {
   '01_pacco-logo-1.png': { width: 1672, height: 941 },
   '02_login-page-ux.png': { width: 1448, height: 1086 },
+  '03_welcome-page-ux.png': { width: 1448, height: 1086 },
 } as const
 
 /**
@@ -58,6 +59,15 @@ describe('committed design references', () => {
     expect(script).toContain("'docs', 'design-reference', '02_login-page-ux.png'")
   })
 
+  it('has a runnable visual check per screen, each naming its own reference', () => {
+    const scripts = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')).scripts
+    expect(scripts['verify:visual']).toContain('visual-fidelity-check.mjs')
+    // 🚫 The landing screen's check is not the login check re-run: it names its
+    // own route and its own reference, or it would measure nothing new.
+    expect(scripts['verify:visual:welcome']).toContain('--route=/welcome')
+    expect(scripts['verify:visual:welcome']).toContain('--reference=03_welcome-page-ux.png')
+  })
+
   it('leaves the background image as the one shipped asset rather than a second copy', () => {
     // `04_backgroud-img.png` is byte-identical to the asset the client renders,
     // so it is committed once, as that asset. The reference directory says so;
@@ -65,10 +75,10 @@ describe('committed design references', () => {
     expect(existsSync(join(REPO_ROOT, 'src', 'assets', 'office-background.png'))).toBe(true)
   })
 
-  it('does not carry the Welcome screen, which belongs to the wave that builds it', () => {
+  it('carries the Welcome screen now that the wave which builds it has landed', () => {
     // LOW_LEVEL_SPEC-13652-wave-2.md §L.2.2 assigns `/welcome` and its
-    // component tree to wave-2. Committing its comp here would imply this wave
-    // renders it.
-    expect(existsSync(join(REFERENCE_DIR, '03_welcome-page-ux.png'))).toBe(false)
+    // component tree to wave-2, which is why this comp arrives with it rather
+    // than ahead of it.
+    expect(existsSync(join(REFERENCE_DIR, '03_welcome-page-ux.png'))).toBe(true)
   })
 })

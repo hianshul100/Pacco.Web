@@ -119,6 +119,52 @@ describeGateway('gateway CORS configuration', () => {
   )
 })
 
+/**
+ * LOW_LEVEL_SPEC-13652-wave-2.md §L.6.A.4 NEG-10, second half: the landing wave
+ * changes the gateway configuration in NO way at all.
+ *
+ * ⚠️ The task constraint is explicit -- "no new logout/revoke gateway route and
+ * no change to the gateway's JWT validation/revocation behaviour" -- and
+ * §L.9 lists every file under `Pacco.APIGateway` as a forbidden write. These
+ * assertions are the client-side evidence that the constraint held.
+ *
+ * 🚫 No secret is reproduced here. The signing key lives in the gateway's own
+ * configuration; these checks name KEYS and flags, never values.
+ */
+describeGateway('gateway configuration is untouched by the landing wave', () => {
+  it.each(CONFIG_FILES)('%s keeps JWT validation stateless and deny-list free', (name) => {
+    const content = readConfig(name)
+    // ADR-007: validation at the edge is stateless. Logout is a client-side
+    // session discard, so there is no revocation store for the edge to consult
+    // and none was introduced.
+    expect(content).not.toMatch(/revocation|deny-?list|black-?list|block-?list/i)
+    // ADR-022: the session is bounded by the access token's own `exp`, which
+    // only means anything while the edge still checks it.
+    expect(content).toMatch(/validateLifetime:\s*true/)
+    expect(content).toMatch(/validateIssuer:\s*true/)
+  })
+
+  it.each(CONFIG_FILES)('%s leaves the auth block and its role-claim mapping alone', (name) => {
+    // The role the landing screen presents is the one the gateway maps from
+    // this claim URI. 🚫 The client never invents, infers or renames it.
+    expect(readConfig(name)).toContain(
+      'auth:\n  enabled: true\n  global: false\n  claims:\n' +
+        '    role: http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
+    )
+  })
+
+  it.each(CONFIG_FILES)('%s leaves customErrors alone', (name) => {
+    expect(readConfig(name)).toContain('customErrors:\n    includeExceptionMessage: true')
+  })
+
+  it.each(CONFIG_FILES)('%s declares no route for the landing screen itself', (name) => {
+    // The landing screen is a client route. It has no upstream, because it
+    // makes no request: §L.3 item 3 rule 4.
+    const content = readConfig(name)
+    expect(content).not.toMatch(/upstream:\s*\/(welcome|landing)\b/i)
+  })
+})
+
 describe('gateway configuration availability', () => {
   it('locates the four ntrada*.yml files, or fails with the full search path', () => {
     // A skipped edge check must be visible and must not read as a pass. The

@@ -7,7 +7,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { LOGIN_COPY } from '@/features/login/copy'
-import type { LoginTelemetryEvent } from '@/platform/telemetry'
+import type { TelemetryEvent } from '@/platform/telemetry'
 import { Telemetry } from '@/platform/telemetry'
 import { MESSAGE_REGISTRY } from '@/session/messageRegistry'
 import { SESSION_STORAGE_KEY, SessionStore } from '@/session/sessionStore'
@@ -37,7 +37,7 @@ async function signIn(
   await user.click(submitButton())
 }
 
-let events: LoginTelemetryEvent[]
+let events: TelemetryEvent[]
 
 beforeEach(() => {
   events = []
@@ -81,12 +81,17 @@ describe('sign-in round trip', () => {
 
   it('case 4: expiry comes from the token exp claim, never from AuthDto.expires', async () => {
     const user = userEvent.setup()
-    const token = accessTokenWithClaims({ exp: 1700000000 })
+    // A FUTURE `exp`, so the session survives the landing guard and can still
+    // be read once the journey completes. The point of the case is that
+    // `expiresAt` follows the claim and not `AuthDto.expires`; an already-past
+    // claim would additionally be discarded by `RequireSession`, which is
+    // asserted separately in the landing-guard suite.
+    const token = accessTokenWithClaims({ exp: 1893456000 })
     renderLogin({
       client: recordingClient([okResponse(authDto({ accessToken: token, expires: 999 }))]),
     })
     await signIn(user)
-    await waitFor(() => expect(SessionStore.read()?.expiresAt).toBe(1700000000))
+    await waitFor(() => expect(SessionStore.read()?.expiresAt).toBe(1893456000))
     expect(SessionStore.read()?.expiresRaw).toBe(999)
   })
 
@@ -219,10 +224,14 @@ describe('telemetry sequence', () => {
     await signIn(user)
     await waitFor(() => expect(SessionStore.read()).not.toBeNull())
 
+    // The journey now completes: the success navigation resolves to the
+    // landing screen, which emits its own view event. The `login.*` prefix is
+    // still the whole of the sign-in sequence, in order.
     expect(events.map((event) => event.name)).toEqual([
       'login.viewed',
       'login.submitted',
       'login.succeeded',
+      'landing.viewed',
     ])
     const serialised = JSON.stringify(events)
     expect(serialised).not.toContain('someone@pacco.io')

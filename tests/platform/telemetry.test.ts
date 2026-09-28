@@ -1,4 +1,4 @@
-import type { LoginTelemetryEvent } from '@/platform/telemetry'
+import type { TelemetryEvent } from '@/platform/telemetry'
 import { Telemetry } from '@/platform/telemetry'
 
 describe('Telemetry', () => {
@@ -9,7 +9,7 @@ describe('Telemetry', () => {
   })
 
   it('delivers events to the installed sink', () => {
-    const events: LoginTelemetryEvent[] = []
+    const events: TelemetryEvent[] = []
     Telemetry.setTelemetrySink((event) => events.push(event))
     Telemetry.emit({ name: 'login.viewed', route: '/login' })
     expect(events).toEqual([{ name: 'login.viewed', route: '/login' }])

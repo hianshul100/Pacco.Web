@@ -28,7 +28,60 @@ import backgroundSrc from '@/assets/office-background.png'
 import { PaccoLockup } from '@/components/PaccoLockup'
 import { BRAND_COPY } from '@/features/login/copy'
 
-export function BrandFrame({ children }: { readonly children: ReactNode }) {
+/**
+ * Which supplied reference the frame is reproducing.
+ *
+ * `login` is `02_login-page-ux.png`, unchanged. `landing` is
+ * `03_welcome-page-ux.png`, which keeps the gradient, the photograph, the arcs,
+ * the right rail and the footer byte-for-byte, and differs in exactly three
+ * ways: a full-bleed top bar replaces the inline header row, the left rail is
+ * empty, and the card column is wider.
+ *
+ * ⚠️ There is no second approximation here. LOW_LEVEL_SPEC-13652-wave-2.md
+ * §L.12.5 records that no Figma file and no style sheet exist for capability
+ * `13652`, and requires the landing screen to inherit whatever wave-1
+ * approximated so "the two screens must not diverge".
+ */
+export type BrandFrameVariant = 'login' | 'landing'
+
+/** Per-variant geometry, measured from each reference at its native 1448px. */
+const VARIANT = {
+  login: {
+    // Card column 35.2rem; grid starts 72px below the inline header row.
+    grid: 'md:grid-cols-[minmax(0,1fr)_minmax(0,35.2rem)_minmax(0,1fr)] md:pt-[4.5rem]',
+    // Rails sit level with the card's upper third.
+    rightRail: 'md:pl-[8rem] md:pt-[8.2rem]',
+  },
+  landing: {
+    // Card column 40.125rem (642px); the card's top edge falls at y=258, which
+    // is the 100px top bar plus the container's 2.2rem inset plus 7.68rem.
+    grid: 'md:grid-cols-[minmax(0,1fr)_minmax(0,40.125rem)_minmax(0,1fr)] md:pt-[7.68rem]',
+    // The wider card column narrows the rail track, so the left inset shrinks
+    // to keep the rail text at the same x the login reference puts it.
+    rightRail: 'md:pl-[5.55rem] md:pt-2',
+  },
+} as const
+
+export function BrandFrame({
+  children,
+  variant = 'login',
+  topBar,
+}: {
+  readonly children: ReactNode
+  readonly variant?: BrandFrameVariant
+  /**
+   * A full-bleed band rendered above the framed container. The landing screen
+   * passes its top bar here because the reference runs that band edge to edge,
+   * over the photograph, rather than inside the page's own gutters.
+   *
+   * 🚫 The frame never creates this content. It is a slot, so the only
+   * focusable control on the landing screen stays owned by the landing screen
+   * and the frame itself remains decorative and out of the tab order.
+   */
+  readonly topBar?: ReactNode
+}) {
+  const geometry = VARIANT[variant]
+
   return (
     <div className="pacco-page-gradient relative flex min-h-screen w-full flex-col overflow-x-hidden">
       {/* Reference: the office photograph blended into the right third of the
@@ -56,47 +109,62 @@ export function BrandFrame({ children }: { readonly children: ReactNode }) {
         className="pointer-events-none absolute -bottom-[7.9rem] -left-[5.55rem] hidden h-[27.8rem] w-[27.8rem] rounded-full bg-arc-inner md:block"
       />
 
-      <div className="relative mx-auto flex w-full max-w-[100rem] flex-1 flex-col px-5 py-6 md:px-[4.75rem] md:py-[2.2rem]">
-        <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <PaccoLockup size="md" />
-          <p className="text-sm leading-snug text-ink-500 md:text-right">
-            {BRAND_COPY.taglineLineOne}
-            <br />
-            {BRAND_COPY.taglineLineTwo}
-          </p>
-        </header>
+      {topBar}
 
-        <div className="flex flex-1 flex-col gap-10 py-8 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,35.2rem)_minmax(0,1fr)] md:items-start md:gap-8 md:py-0 md:pt-[4.5rem]">
+      <div className="relative mx-auto flex w-full max-w-[100rem] flex-1 flex-col px-5 py-6 md:px-[4.75rem] md:py-[2.2rem]">
+        {/* The landing reference replaces this row with the full-bleed top bar
+            above, so it is not rendered there. */}
+        {variant === 'login' ? (
+          <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <PaccoLockup size="md" />
+            <p className="text-sm leading-snug text-ink-500 md:text-right">
+              {BRAND_COPY.taglineLineOne}
+              <br />
+              {BRAND_COPY.taglineLineTwo}
+            </p>
+          </header>
+        ) : null}
+
+        <div
+          className={`flex flex-1 flex-col gap-10 py-8 md:grid md:items-start md:gap-8 md:py-0 ${geometry.grid}`}
+        >
           {/* Left rail -- decorative headline, start-aligned with the top inset
-              the reference uses. */}
+              the reference uses. The landing reference leaves this column
+              empty, so the rail renders as an empty track there and the card
+              keeps the page's centre line. */}
           <aside
             aria-hidden="true"
             className="hidden w-full min-w-0 md:block md:pt-[8.6rem]"
             data-testid="brand-left-rail"
           >
-            {/* Reference: the break falls after "Everything", so the accent
-                phrase stays whole on its own line. */}
-            <p className="text-[2.5rem] font-bold leading-[1.15] tracking-tight text-ink-900">
-              {BRAND_COPY.headlineLeading}
-              <br />
-              <span className="text-brand-600">{BRAND_COPY.headlineAccent}</span>
-            </p>
-            <p className="mt-[1.6rem] text-xl leading-[1.55] text-ink-500">
-              {BRAND_COPY.headlineSupportOne}
-              <br />
-              {BRAND_COPY.headlineSupportTwo}
-            </p>
-            <span className="mt-8 block h-[3px] w-12 rounded-pill bg-brand-300" />
+            {variant === 'login' ? (
+              <>
+                {/* Reference: the break falls after "Everything", so the accent
+                    phrase stays whole on its own line. */}
+                <p className="text-[2.5rem] font-bold leading-[1.15] tracking-tight text-ink-900">
+                  {BRAND_COPY.headlineLeading}
+                  <br />
+                  <span className="text-brand-600">{BRAND_COPY.headlineAccent}</span>
+                </p>
+                <p className="mt-[1.6rem] text-xl leading-[1.55] text-ink-500">
+                  {BRAND_COPY.headlineSupportOne}
+                  <br />
+                  {BRAND_COPY.headlineSupportTwo}
+                </p>
+                <span className="mt-8 block h-[3px] w-12 rounded-pill bg-brand-300" />
+              </>
+            ) : null}
           </aside>
 
           <main className="flex w-full min-w-0 items-start justify-center">{children}</main>
 
           {/* Right rail -- hidden below 768px per SPECIFICATION.md §11.2. The
               left inset places it clear of the backdrop's plant, where the
-              reference puts it. */}
+              reference puts it. Both references place this text at the same
+              page x, which is why the inset is per-variant. */}
           <aside
             aria-hidden="true"
-            className="hidden w-full min-w-0 md:block md:pl-[8rem] md:pt-[8.2rem]"
+            className={`hidden w-full min-w-0 md:block ${geometry.rightRail}`}
             data-testid="brand-right-rail"
           >
             {/* Reference: left-aligned, regular weight, muted ink -- not a

@@ -14,7 +14,9 @@
     "test": "jest",
     "test:coverage": "jest --coverage",
     "verify:cors-browser": "node scripts/cors-browser-check.mjs",
-    "verify:visual": "node scripts/visual-fidelity-check.mjs"
+    "verify:visual": "node scripts/visual-fidelity-check.mjs",
+    "verify:visual:welcome": "node scripts/visual-fidelity-check.mjs --route=/welcome --reference=03_welcome-page-ux.png --seed=admin",
+    "verify:edge": "node scripts/edge-conformance-check.mjs"
   },
   "dependencies": {
     "react": "^19.1.1",

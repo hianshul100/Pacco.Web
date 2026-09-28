@@ -9,11 +9,14 @@
  * ADR-021 §5 rule 1: this is the standalone browser client. It is served from
  * its own local origin by its own process, never from a backend service image
  * and never by the gateway.
+ *
+ * Each route owns its own brand frame and its own document title -- the
+ * landing screen's chrome is not the sign-in screen's -- so neither lives
+ * above the route table.
  */
 import { useMemo } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 
-import { BrandFrame } from '@/components/BrandFrame'
 import { Router } from '@/Router'
 import type { AppConfig } from '@/config/appConfig'
 import { readInjectedAppConfig } from '@/config/appConfig'
@@ -26,12 +29,7 @@ export function AppShell({ config }: { readonly config?: AppConfig }) {
 
   return (
     <BrowserRouter>
-      {/* React 19 Document Metadata: the title is declared in the tree. */}
-      <title>Sign in · Pacco</title>
-      <meta name="description" content="Sign in to your Pacco account." />
-      <BrandFrame>
-        <Router client={client} />
-      </BrandFrame>
+      <Router client={client} />
     </BrowserRouter>
   )
 }
