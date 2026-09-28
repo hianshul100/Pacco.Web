@@ -2339,44 +2339,261 @@ Automation hint: assert the identical message string after each of the six rejec
 Given six consecutive rejected sign-in attempts, when a seventh attempt carries the correct password, then every rejection showed the same message with no lockout or delay and the seventh attempt succeeds.";"Requirement IDs: AC-9, AC-13, FR-8, FR-9, DO1
 Jira: 13652
 Implicit: the platform catalogue records that the sign-in service keeps no failed-attempt tracking and no lockout counter, so no throttle exists for this screen to surface and none may appear";Valid
-REVIEW-NOTES;Self-review summary;"BLOCK A — ACCEPTANCE CRITERIA COVERAGE (28 criteria, 119 test cases)
+TC-13652-120;Verify that the landing screen shows its confirmation line beneath the welcome heading;The landing screen tells the user in one short line that they are signed in, directly under the role-dependent heading. This test checks that the confirmation line renders for an administrator and for an ordinary user, word for word. Without it the screen is a bare heading and a user who expected a dashboard cannot tell whether the sign-in actually completed.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. An administrator account and an ordinary account both exist and can sign in.
+3. The agreed wording for both screens is available to the tester.";"Administrator account = ada.morrison@pacco.example.com
+Ordinary account = tom.hale@pacco.example.com
+Expected confirmation line = You are signed in successfully.
+Expected administrator heading = Welcome to Admin Area
+Expected ordinary heading = Welcome
+
+Automation hint: read the text node immediately following the page heading and compare it to the expected string with exact equality, once per account.";"1. Sign in at http://localhost:5173/login as the administrator account.
+2. Read the heading and the line directly beneath it on the Welcome screen.
+3. Log out and sign in again as the ordinary account.
+4. Read the heading and the line directly beneath it again.
+5. Count how many times the confirmation line appears anywhere on the screen.";"1. The Welcome screen is reached at http://localhost:5173/welcome.
+2. The heading reads exactly ""Welcome to Admin Area"" and the line beneath it reads exactly ""You are signed in successfully."".
+3. The Welcome screen is reached again for the ordinary account.
+4. The heading reads exactly ""Welcome"" and the line beneath it reads exactly the same confirmation sentence — the line does not change with the role.
+5. The confirmation line appears exactly once on the screen.";The same confirmation line renders exactly once beneath the heading for both account types, while only the heading changes with the role.;1. Log out so the next run starts with no session.;Pacco Login and Role-Aware Landing;Medium;pacco-web-welcome;UI;Automatable;Functional Testing;Functional;Regression;"AC-26
+Given a live session, when the landing screen renders, then it carries the role-dependent message and the agreed supporting copy and nothing beyond the permitted inventory.";"Requirement IDs: AC-26, FR-18, DO2
+Jira: 13652";Valid
+TC-13652-121;Verify that the landing card renders its guidance line and divider exactly once;Below the confirmation line the landing card carries a divider and a short guidance sentence. This test asserts both are present, in that order, and appear once. Duplicated or missing chrome here is the first visible sign that the card has been assembled from the wrong pieces, and it is cheaper to catch as a content assertion than in a manual visual review.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. A session has been established through a real sign-in.
+3. The agreed wording for the landing screen is available to the tester.";"Signed-in account = tom.hale@pacco.example.com
+Expected guidance line = Use the navigation to continue.
+Expected order = heading, confirmation line, divider, guidance line
+
+Automation hint: read the card's children in document order and assert the sequence of text and separator elements matches the expected order, with one occurrence of each.";"1. Sign in at http://localhost:5173/login and reach the Welcome screen.
+2. Read every text region inside the welcome card in the order it appears.
+3. Read the separator elements inside the welcome card.
+4. Count the occurrences of the guidance line on the whole screen.
+5. Reload the page and repeat the reading of the card's contents.";"1. The Welcome screen renders at http://localhost:5173/welcome.
+2. The text regions appear in this order: the role-dependent heading, the confirmation line, then the guidance line reading exactly ""Use the navigation to continue."".
+3. Exactly one separator element sits between the confirmation line and the guidance line.
+4. The guidance line appears exactly once.
+5. The order and the counts are identical after the reload.";The welcome card renders its heading, confirmation line, single divider and guidance line in that order, once each, and the arrangement survives a reload.;1. Log out so the next run starts with no session.;Pacco Login and Role-Aware Landing;Low;pacco-web-welcome;UI;Automatable;Functional Testing;Functional;Regression;"AC-26
+Given a live session, when the landing screen renders, then its card carries the agreed supporting copy and separator and nothing beyond the permitted inventory.";"Requirement IDs: AC-26, FR-18, DO2
+Jira: 13652";Valid
+TC-13652-122;Verify that the top bar carries the brand mark and a control named Logout;"The top bar is the only place the landing screen offers an action, and that action must be announced as ""Logout"" rather than by an unlabelled icon. This test checks the mark renders as decoration and the control carries its exact name. A glyph-only exit control is unusable to a screen-reader user and indistinguishable from a close button to everyone else.";"1. The Pacco browser client is running locally at http://localhost:5173.
+2. A session has been established through a real sign-in.
+3. An accessibility inspector is available for reading element names.";"Signed-in account = ada.morrison@pacco.example.com
+Expected control name = Logout
+Expected brand mark treatment = decorative, carrying no announced text
+
+Automation hint: locate the control by its accessible name ""Logout"" inside the banner region and assert the brand image contributes no text to the accessibility tree.";"1. Sign in at http://localhost:5173/login and reach the Welcome screen.
+2. Read the contents of the bar across the top of the screen.
+3. Read the announced name of the action in the top bar.
+4. Read how the brand mark is exposed to assistive technology.
+5. Narrow the browser window to 320 pixels wide and read the top bar again.";"1. The Welcome screen renders at http://localhost:5173/welcome.
+2. The top bar holds exactly two things: the Pacco brand mark on the left and one action on the right.
+3. The action announces as ""Logout"" and is operable as a button.
+4. The brand mark is exposed as decoration and contributes no announced text.
+5. Both the mark and the Logout control remain visible; the action is not collapsed into a hidden menu at any width.";The top bar renders the decorative brand mark and a single button announced as Logout, and keeps both visible down to the narrowest supported width.;1. Restore the browser window to its original size and log out.;Pacco Login and Role-Aware Landing;High;pacco-web-welcome;UI;Automatable;Functional Testing;Functional;Regression;"AC-26
+Given a live session, when the landing screen renders, then it carries the brand identity and the logout control and nothing beyond the permitted inventory.";"Requirement IDs: AC-26, FR-18, DO2
+Jira: 13652";Valid
+TC-13652-123;Verify that the Login screen shows no session notice when opened without one;The session-ended notice must appear only when a session actually ended. This test opens the Login screen cold and checks the notice region is empty. A notice that renders on every visit teaches users to ignore it, which quietly defeats the one case where it carries real information.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. Browser storage holds no session and no prior sign-in state.
+3. No redirect has occurred in this browsing context.";"Target address = http://localhost:5173/login
+Forbidden notice = Your session has ended. Please sign in again to continue.
+Forbidden messages = the three sign-in failure messages
+
+Automation hint: assert the status region is either absent or empty on a cold entry, then assert it is populated only on the expiry redirect path.";"1. Clear browser storage and open http://localhost:5173/login directly.
+2. Read the status region above the sign-in card.
+3. Read every other message region on the screen.
+4. Reload the page and read the status region again.
+5. Seed an expired session, open the landing address, and read the status region on arrival.";"1. The Login screen renders with both fields empty.
+2. The status region is empty — no session-ended notice is shown.
+3. No sign-in failure message is shown either; the screen carries no message at all on entry.
+4. The status region is still empty after the reload.
+5. Only now does the session-ended notice appear, confirming the region is populated by the expiry path and by nothing else.";The session-ended notice is absent on a cold entry to the Login screen and appears only when an expired session sent the user there.;1. Clear browser storage so the seeded expired session does not persist.;Pacco Login and Role-Aware Landing;Medium;pacco-web-login;UI;Automatable;Negative Testing;Functional;Regression;"AC-21
+Given no session has expired, when the Login screen is opened, then no session-expired notice is shown; the notice is reserved for the expiry path.";"Requirement IDs: AC-21, FR-15, DO2, N3
+Jira: 13652";Valid
+TC-13652-124;Verify that a sign-in failure message does not displace the session-ended notice;"A user whose session expired is sent to the Login screen with a notice; if their next attempt then fails, two different pieces of information are on screen at once. This test checks the failure message and the session notice occupy separate regions and neither overwrites the other. Collapsing them into one slot loses whichever arrived first and leaves the user guessing why they are here.";"1. The Pacco browser client is running locally at http://localhost:5173.
+2. An account exists whose password is known.
+3. A session is present in browser storage whose expiry is in the past.";"Account = tom.hale@pacco.example.com
+Wrong password = NotTheRightOne!9
+Expected notice = Your session has ended. Please sign in again to continue.
+Expected failure message = The email or password you entered is incorrect.
+
+Automation hint: assert the notice lives in a status region and the failure message in an alert region, then assert both strings are present simultaneously after the failed attempt.";"1. Open http://localhost:5173/welcome with the expired session in storage.
+2. Read the notice on the Login screen the client lands on.
+3. Enter the account address and the wrong password, then submit.
+4. Read every message region on the screen once the attempt settles.
+5. Correct the password and submit again, then read the message regions once more.";"1. The client redirects to http://localhost:5173/login without rendering the landing screen.
+2. The session-ended notice is shown in the screen's status region.
+3. The submission is accepted and the request settles as a rejection.
+4. Both messages are present at once and in separate regions: the session-ended notice remains in the status region and the credentials failure message appears in its own announced region.
+5. On the successful attempt both regions are cleared and the user reaches the Welcome screen.";The session-ended notice and a sign-in failure message coexist in separate regions, and neither is lost or overwritten by the other.;"1. Log out to clear the session.
+2. Clear browser storage so no seeded expired session remains.";Pacco Login and Role-Aware Landing;Medium;pacco-web-login;UI;Automatable;Functional Testing;Functional;Regression;"AC-21, AC-9
+Given the user arrived at the Login screen because their session expired, when a further sign-in attempt fails, then the session notice and the failure message are both shown, in separate regions.";"Requirement IDs: AC-21, AC-9, FR-8, FR-15, DO1, DO2, N2, N3
+Jira: 13652";Valid
+TC-13652-125;Verify that a new failure outcome replaces the previous message rather than stacking;Three different sign-in failures can follow one another in the same page session. This test drives a credentials rejection, then an availability failure, then a malformed success, and checks that exactly one failure message is on screen at each point. Stacked messages leave the user reading a stale reason for a problem that has already changed.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. The sign-in responses can be intercepted and varied per attempt.
+3. The Login screen is open and carries no message.";"Account = tom.hale@pacco.example.com
+Attempt 1 response = rejected credentials
+Attempt 2 response = platform failure at the edge
+Attempt 3 response = a success whose body is unusable
+Expected messages in order = The email or password you entered is incorrect. / Sign-in is temporarily unavailable. Please try again. / Something went wrong. Please try again.
+
+Automation hint: after each attempt count the elements in the message region and assert the count is exactly one and the text equals the expected string for that attempt.";"1. Submit the sign-in form with the intercepted credentials rejection in place.
+2. Read every failure message on the screen.
+3. Submit again with the intercepted platform failure in place, then read every failure message.
+4. Submit again with the intercepted unusable success in place, then read every failure message.
+5. Read the session state held by the client after all three attempts.";"1. The attempt settles and the screen becomes usable again.
+2. Exactly one failure message is present and it reads ""The email or password you entered is incorrect."".
+3. Exactly one failure message is present and it now reads ""Sign-in is temporarily unavailable. Please try again."" — the previous message is gone, not pushed down.
+4. Exactly one failure message is present and it now reads ""Something went wrong. Please try again."".
+5. No session was written by any of the three attempts.";Each new failure outcome replaces the previous message so that exactly one failure message is on screen at any moment, and no attempt writes a session.;1. Remove the response interception and reload the Login screen.;Pacco Login and Role-Aware Landing;High;pacco-web-login;UI;Automatable;Negative Testing;Functional;Regression;"AC-9, AC-11, AC-12
+Given a sequence of different failure outcomes, when each is handled, then exactly one fixed message is shown and it is the one belonging to the most recent outcome.";"Requirement IDs: AC-9, AC-11, AC-12, FR-8, DO1, N2
+Jira: 13652";Valid
+TC-13652-126;Verify that typing in either field clears the displayed sign-in failure message;Once a user starts correcting their entry, the message about the previous attempt is stale. This test checks that the first keystroke in either field clears it. Leaving it on screen while the user types makes it look as though the correction was already rejected.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. An account exists whose password is known.
+3. A failed sign-in has just left a failure message on the screen.";"Account = tom.hale@pacco.example.com
+Wrong password = NotTheRightOne!9
+Correct password = the value held for the test account outside the repository
+Displayed message before typing = The email or password you entered is incorrect.
+
+Automation hint: assert the message region is populated, send a single keystroke to each field in turn, and assert the region is empty after each.";"1. Submit the form with the account address and the wrong password and read the message region.
+2. Type one character into the password field and read the message region again.
+3. Submit the wrong password once more to bring the message back.
+4. Type one character into the address field and read the message region again.
+5. Complete the correct password and submit.";"1. The failure message ""The email or password you entered is incorrect."" is shown.
+2. The message region is empty; the stale message cleared on the first keystroke.
+3. The failure message is shown again.
+4. The message region is empty again; editing either field clears it.
+5. The sign-in succeeds and the user reaches the Welcome screen without a page reload.";Editing either field clears the stale failure message, and a corrected entry then signs in within the same page session.;1. Log out so the next run starts with no session.;Pacco Login and Role-Aware Landing;Medium;pacco-web-login;UI;Automatable;Usability Testing;Usability;Regression;"AC-13
+Given a failed sign-in, when the user edits either field, then the stale failure message is cleared and a corrected submission succeeds without reloading the page.";"Requirement IDs: AC-13, FR-9, DO1
+Jira: 13652";Valid
+TC-13652-127;Verify that both fields are read-only while a sign-in request is in flight;While a submission is in flight the screen must stop accepting edits, so the values sent and the values displayed cannot drift apart. This test holds a response open and tries to type into both fields. A field that stays editable mid-request lets a user watch one address on screen while a different one is being authenticated.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. The sign-in response can be delayed on demand.
+3. The Login screen is open with valid values entered in both fields.";"Account = tom.hale@pacco.example.com
+Response delay = 5 seconds
+Typed-during-flight text = zzz
+
+Automation hint: intercept the sign-in call with a 5 second delay, then assert both inputs report themselves as not editable and their values are unchanged while the call is open.";"1. Submit the form with the sign-in response delayed by 5 seconds.
+2. While the request is open, attempt to type three characters into the address field.
+3. While the request is still open, attempt to type three characters into the password field.
+4. Read the values of both fields and the state of the submit control while the request is open.
+5. Let the response arrive and read the state of both fields and the submit control again.";"1. The submit control enters its processing state and the request is issued once.
+2. The address field rejects the input; its value is unchanged from what was submitted.
+3. The password field rejects the input; its value is unchanged from what was submitted.
+4. Both fields report themselves as not editable and the submit control is disabled and busy.
+5. Once the response settles both fields are editable again and the submit control is enabled — the screen is never left locked.";Both fields are read-only for the duration of the in-flight request and become editable again the moment it settles.;1. Remove the response delay and reload the Login screen.;Pacco Login and Role-Aware Landing;High;pacco-web-login;UI;Automatable;Functional Testing;Functional;Regression;"AC-4
+Given a submission is in flight, when the user attempts to edit either field, then the edit is refused and the submitted values are unchanged until the request settles.";"Requirement IDs: AC-4, FR-4, DO1, N7
+Jira: 13652";Valid
+TC-13652-128;Verify that only the field that failed validation is marked invalid to assistive technology;Required-field validation must mark exactly the offending field, so a screen-reader user is told which entry to fix rather than that the whole form is wrong. This test submits with one field empty and inspects both fields. Marking both is worse than marking neither: it sends the user back over an entry that was already correct.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. An accessibility inspector is available for reading element state and descriptions.
+3. The Login screen is open with both fields empty.";"Address value = tom.hale@pacco.example.com
+Password value = left empty for the first attempt
+Expected password message = Enter your password to continue.
+Expected address message = Enter your email address or username to continue.
+
+Automation hint: assert the invalid state is present on the offending input only, that its error text is referenced as that input's description, and that the state clears once the field is filled.";"1. Enter the address, leave the password empty, and submit.
+2. Read the invalid state and the announced description of the password field.
+3. Read the invalid state and the announced description of the address field.
+4. Type a value into the password field and read the invalid state of both fields again.
+5. Clear the address field, submit again, and read the invalid state of both fields.";"1. The submission is blocked, focus moves to the password field, and no request is issued.
+2. The password field is marked invalid and announces its required-field message as its own description, alongside its helper text.
+3. The address field is not marked invalid and announces only its helper text — the correct entry carries no error.
+4. The password field's invalid state is removed once it holds a value; the address field is still not marked invalid.
+5. The marking has swapped: the address field is now marked invalid with its own message and the password field is not.";The invalid state and the error description attach only to the field that actually failed validation, and move correctly when the offending field changes.;1. Reload the Login screen so both fields return to their untouched state.;Pacco Login and Role-Aware Landing;High;pacco-web-login;UI;Automatable;Accessibility Testing;Accessibility;Regression;"AC-3
+Given the user submits with one field empty, when the submission is blocked, then a visible message is associated with that field alone, focus moves to it, and no request is issued.";"Requirement IDs: AC-3, FR-3, DO1
+Jira: 13652";Valid
+TC-13652-129;Verify that unreadable browser storage is treated as no session at the landing screen;Browser storage can hold a record the client cannot make sense of, or refuse access outright in a restricted browsing context. This test corrupts the stored record and then blocks storage entirely, and checks both are treated as no session. Any other reading — admitting the user, or crashing the screen — turns an unreadable value into either a security hole or a dead end.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. Browser storage can be seeded with arbitrary content and can be made to refuse access.
+3. Network traffic from the browser is being recorded.";"Corrupt stored record = not-json-at-all
+Stored record with an unusable expiry = a token and role with the expiry set to the text later
+Target address = http://localhost:5173/welcome
+Expected destination = http://localhost:5173/login
+
+Automation hint: run the navigation three times — corrupt record, unusable expiry, storage access throwing — and assert the same redirect and an empty landing surface each time.";"1. Seed browser storage with a record that is not readable as a session and open the landing address.
+2. Read the browser address bar and the rendered screen.
+3. Seed a record whose expiry value cannot be read as a moment in time and open the landing address again.
+4. Make browser storage refuse access entirely and open the landing address a third time.
+5. Read the recorded network traffic for all three attempts.";"1. The client does not render the landing screen at any point.
+2. The address bar shows http://localhost:5173/login and the Login screen is interactive.
+3. The unusable expiry is treated as expired: the user lands on the Login screen with the session-ended notice and the record is discarded.
+4. The refused storage is treated as no session at all: the user lands on the Login screen, no notice is shown, and nothing crashes.
+5. Zero backend requests were issued across all three attempts.";An unreadable stored record and inaccessible storage both resolve to the Login screen without rendering the landing surface and without contacting the platform.;"1. Restore normal storage access.
+2. Clear browser storage so no seeded record remains.";Pacco Login and Role-Aware Landing;High;pacco-web-session;UI;Automatable;Edge cases Testing;Functional;Regression;"AC-20, AC-21
+Given the browser holds no usable session, when the landing address is requested, then the user is redirected to the Login screen and no part of the landing screen is rendered.";"Requirement IDs: AC-20, AC-21, FR-14, FR-15, DO2, N3
+Jira: 13652";Valid
+TC-13652-130;Verify that a no-session redirect writes nothing to storage and mounts no landing markup;Turning an anonymous visitor away must be a pure decision: nothing written, nothing rendered. This test watches browser storage and the rendered tree across a redirect from the landing address. A guard that writes a placeholder record on the way out gives the next visit something to misinterpret, and one that mounts the landing screen before redirecting leaks its contents.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. Browser storage is empty and is being observed for writes and removals.
+3. The rendered element tree is being recorded continuously from navigation to settle.";"Target address = http://localhost:5173/welcome
+Expected destination = http://localhost:5173/login
+Expected storage writes during the redirect = 0
+Expected storage removals during the redirect = 0
+Forbidden markup = the welcome heading, the role indicator and the logout control
+
+Automation hint: record every storage write and removal for the duration of the navigation and assert both counts are zero, and assert the landing component is never constructed.";"1. Clear browser storage and start observing writes and removals.
+2. Open http://localhost:5173/welcome and record the rendered tree continuously until it settles.
+3. Read the observed storage writes and removals.
+4. Search the recorded tree for the welcome heading, the role indicator and the logout control.
+5. Read the browser address bar and the screen the client settled on.";"1. Storage is empty and the observation is active.
+2. The navigation resolves without a visible flash of the landing screen.
+3. Zero writes and zero removals were observed; the redirect touched storage at no point.
+4. None of the three landing elements appears in any recorded frame — the landing screen was never built, not built and then removed.
+5. The address bar shows http://localhost:5173/login and the Login screen is interactive.";An anonymous request for the landing address redirects without writing to or clearing storage and without ever constructing the landing screen.;1. Stop the storage observation and the tree recording.;Pacco Login and Role-Aware Landing;Blocker;pacco-web-session;UI;Automatable;Security Testing;Security;Regression;"AC-20
+Given no session in the browser, when the landing address is requested, then the user is redirected to the Login screen and no part of the landing screen is rendered at any point.";"Requirement IDs: AC-20, FR-14, DO2, N3
+Jira: 13652";Valid
+TC-13652-131;Verify that the stored role is unchanged by every landing screen interaction;The role is decided once, by the platform, at sign-in. This test signs in and then drives every interaction the landing screen offers, comparing the stored role before and after each one. A role that any later interaction can rewrite would make the administrator message reachable without an administrator account, which is exactly the outcome this capability exists to prevent.;"1. The Pacco browser client is running locally at http://localhost:5173.
+2. An ordinary account exists and can sign in through the running platform.
+3. The stored session record can be read between interactions.";"Ordinary account = tom.hale@pacco.example.com
+Expected stored role after sign-in = user
+Interactions exercised = reload, back navigation, forward navigation, opening the root address
+Forbidden heading = Welcome to Admin Area
+
+Automation hint: capture the stored session record after sign-in and compare it character for character after each interaction; assert the heading stays constant too.";"1. Sign in at http://localhost:5173/login as the ordinary account and read the stored session record and the heading.
+2. Reload the Welcome screen, then read the stored record and the heading again.
+3. Navigate back and then forward, then read the stored record and the heading again.
+4. Open http://localhost:5173/ and read the stored record and the heading once the client resolves.
+5. Compare all four readings of the stored record.";"1. The stored role reads ""user"" and the heading reads exactly ""Welcome"".
+2. The stored record is unchanged and the heading still reads ""Welcome"".
+3. The stored record is unchanged and the heading still reads ""Welcome""; navigating does not rewrite the session.
+4. The root address resolves to the Welcome screen, the stored record is unchanged and the heading still reads ""Welcome"".
+5. All four readings are character-for-character identical, and the administrator heading was never rendered.";The stored role written at sign-in survives every landing screen interaction unchanged, and the rendered heading follows it every time.;1. Log out so the next run starts with no session.;Pacco Login and Role-Aware Landing;Blocker;pacco-web-session;UI;Automatable;Security Testing;Security;Regression;"AC-17, AC-18, AC-19
+Given a live session, when the user reloads or navigates around the landing screen, then the stored role is never rewritten and the heading continues to match the authenticated role.";"Requirement IDs: AC-17, AC-18, AC-19, FR-12, FR-13, DO2, N4
+Jira: 13652";Valid
+REVIEW-NOTES;Self-review summary;"BLOCK A — ACCEPTANCE CRITERIA COVERAGE (28 criteria, 131 test cases)
 
 | Acceptance Criterion | Verdict | Test Cases | Notes |
 | --- | --- | --- | --- |
 | AC-1 one common login screen, no user-type declaration | Full | TC-001, TC-002, TC-003, TC-005, TC-006, TC-085, TC-087, TC-091, TC-093, TC-094, TC-095, TC-111, TC-112 | — |
 | AC-2 password masked, reveal control, value in no other node | Full | TC-004, TC-008, TC-009, TC-010, TC-109 | — |
-| AC-3 required-field messages, focus, zero network | Full | TC-011, TC-012, TC-013, TC-014, TC-079, TC-089, TC-108, TC-110 | — |
-| AC-4 five activations produce one request, control disabled and busy | Full | TC-015, TC-017, TC-080, TC-108 | — |
+| AC-3 required-field messages, focus, zero network | Full | TC-011, TC-012, TC-013, TC-014, TC-079, TC-089, TC-108, TC-110, TC-128 | — |
+| AC-4 five activations produce one request, control disabled and busy | Full | TC-015, TC-017, TC-080, TC-108, TC-127 | — |
 | AC-5 submit lock released on network failure | Full | TC-016, TC-034, TC-039 | — |
 | AC-6 only the gateway address is contacted, source scan for stray hosts | Full | TC-018, TC-019, TC-020, TC-082, TC-100, TC-104, TC-105 | — |
 | AC-7 secret scan clean, no pre-filled fields | Full | TC-007, TC-021, TC-022 | — |
 | AC-8 session holds token, lower-cased role, token-derived expiry, user on landing | Full | TC-019, TC-023, TC-024, TC-025, TC-026, TC-027, TC-075, TC-082, TC-106, TC-115, TC-117 | — |
-| AC-9 credential rejection shows the fixed message, no reason or status leaks | Full | TC-028, TC-032, TC-038, TC-077, TC-098, TC-119 | — |
+| AC-9 credential rejection shows the fixed message, no reason or status leaks | Full | TC-028, TC-032, TC-038, TC-077, TC-098, TC-119, TC-124, TC-125 | — |
 | AC-10 unrecognised address gives the same message, no echo | Full | TC-029, TC-078 | — |
-| AC-11 unreachable or failing platform gives the availability message, no session | Full | TC-033, TC-034, TC-035, TC-039, TC-081 | — |
-| AC-12 malformed success gives the generic message, no session, stays on login | Full | TC-030, TC-031, TC-036, TC-037, TC-040, TC-098, TC-115 | — |
-| AC-13 identifier retained, password cleared, retry succeeds without reload | Full | TC-041, TC-077, TC-119 | — |
+| AC-11 unreachable or failing platform gives the availability message, no session | Full | TC-033, TC-034, TC-035, TC-039, TC-081, TC-125 | — |
+| AC-12 malformed success gives the generic message, no session, stays on login | Full | TC-030, TC-031, TC-036, TC-037, TC-040, TC-098, TC-115, TC-125 | — |
+| AC-13 identifier retained, password cleared, retry succeeds without reload | Full | TC-041, TC-077, TC-119, TC-126 | — |
 | AC-14 password absent from console, storage and telemetry | Full | TC-042, TC-043, TC-096, TC-099, TC-116 | — |
 | AC-15 four gateway files byte-identical, exactly one concrete origin | Full | TC-044 | — |
 | AC-16 allowed origin accepted, other origin rejected | Full | TC-045, TC-046, TC-100 | — |
-| AC-17 role admin in any case gives the administrator heading | Full | TC-047, TC-048, TC-049, TC-056, TC-076, TC-084, TC-106 | — |
-| AC-18 user, empty, whitespace, absent, administrator, superuser give the plain heading | Full | TC-026, TC-050, TC-051, TC-052, TC-053, TC-054, TC-055, TC-056, TC-057, TC-075, TC-084, TC-097, TC-114, TC-118 | — |
-| AC-19 admin-prefixed address with an ordinary role gives the plain heading | Full | TC-058, TC-059, TC-114 | — |
-| AC-20 no session redirects and the landing screen never renders | Full | TC-060, TC-061, TC-062, TC-084, TC-106, TC-107, TC-113, TC-118 | — |
-| AC-21 expired session discarded, returned to login with a distinct notice | Full | TC-064, TC-065, TC-074, TC-089, TC-112, TC-113, TC-118 | — |
+| AC-17 role admin in any case gives the administrator heading | Full | TC-047, TC-048, TC-049, TC-056, TC-076, TC-084, TC-106, TC-131 | — |
+| AC-18 user, empty, whitespace, absent, administrator, superuser give the plain heading | Full | TC-026, TC-050, TC-051, TC-052, TC-053, TC-054, TC-055, TC-056, TC-057, TC-075, TC-084, TC-097, TC-114, TC-118, TC-131 | — |
+| AC-19 admin-prefixed address with an ordinary role gives the plain heading | Full | TC-058, TC-059, TC-114, TC-131 | — |
+| AC-20 no session redirects and the landing screen never renders | Full | TC-060, TC-061, TC-062, TC-084, TC-106, TC-107, TC-113, TC-118, TC-129, TC-130 | — |
+| AC-21 expired session discarded, returned to login with a distinct notice | Full | TC-064, TC-065, TC-074, TC-089, TC-112, TC-113, TC-118, TC-123, TC-124, TC-129 | — |
 | AC-22 logout issues zero requests, store empty, token absent, user on login | Full | TC-066, TC-083, TC-084, TC-088, TC-118 | — |
 | AC-23 back after logout lands on login | Full | TC-067, TC-068 | — |
 | AC-24 the only changed gateway key is the allowed-origin list | Full | TC-069, TC-101 | — |
 | AC-25 machine caller with no origin header still succeeds | Full | TC-070, TC-102, TC-103 | — |
-| AC-26 landing screen holds only its four permitted elements, zero network | Full | TC-063, TC-071, TC-086, TC-088, TC-090, TC-092, TC-093, TC-094, TC-095 | — |
+| AC-26 landing screen holds only its four permitted elements, zero network | Full | TC-063, TC-071, TC-086, TC-088, TC-090, TC-092, TC-093, TC-094, TC-095, TC-120, TC-121, TC-122 | — |
 | AC-27 no renewal request, no background timer, no refresh-route reference | Full | TC-063, TC-072, TC-073, TC-074 | — |
 | AC-28 both roles reach the landing screen through the same screen with the matching heading | Full | TC-068, TC-075, TC-076, TC-084, TC-106 | — |
 
 Result: 28 of 28 criteria fully covered, 0 partial, 0 uncovered.
 
 BLOCK B — COVERAGE TRIGGER VERDICTS
-T-1 enumerated UI fields and enumerated event registries — FIRED — TC-002, TC-003, TC-004, TC-005, TC-006, TC-008, TC-009, TC-010 for the named screen elements; TC-116 for the six named sign-in events and TC-118 for the four named landing events, each asserted per event rather than bundled into one telemetry check
-T-2 multiple named failure outcomes — FIRED — TC-028, TC-029, TC-030, TC-031, TC-032, TC-033, TC-034, TC-035, TC-036, TC-037, TC-098
+T-1 enumerated UI fields and enumerated event registries — FIRED — TC-002, TC-003, TC-004, TC-005, TC-006, TC-008, TC-009, TC-010 for the named screen elements; TC-120, TC-121 and TC-122 for the named landing-screen elements — the confirmation line, the guidance line and divider, and the top bar's mark and Logout control; TC-116 for the six named sign-in events and TC-118 for the four named landing events, each asserted per event rather than bundled into one telemetry check
+T-2 multiple named failure outcomes — FIRED — TC-028, TC-029, TC-030, TC-031, TC-032, TC-033, TC-034, TC-035, TC-036, TC-037, TC-098, TC-125, which drives three different outcomes in succession and asserts only the most recent message survives
 T-3 threshold and boundary values — FIRED — TC-035 request timeout boundary, TC-065 session expiry one second either side and exactly at the instant, TC-093 layout breakpoint at 767, 768 and 769 pixels
 T-4 design tokens and visual fidelity — NOT APPLICABLE — the approved style guide and stylesheet were never available in any repository, so no exact colour, radius, spacing or type value is specified anywhere in the inputs and there is nothing to assert against. What can be checked is covered by TC-090 measured contrast and TC-111 manual comparison against the reference image.
 T-5 multi-step user journey — FIRED — TC-075, TC-076, TC-082, TC-084, TC-106
@@ -2385,14 +2602,14 @@ T-7 data flowing across module boundaries — FIRED — TC-023, TC-027, TC-082, 
 T-8 responsive and multi-viewport rendering — FIRED — TC-091 at 320 pixels, TC-092 at 390 by 844, TC-093 at 768 by 1024, TC-094 at 1280 and 1920, TC-095 at double magnification
 T-9 rate limiting and performance targets — NOT APPLICABLE AS A GATE — the inputs define no rate limit on the sign-in route and state explicitly that no latency or availability target has been agreed and that none is to be invented, so no threshold is asserted anywhere in this bundle. What the inputs do require is recorded instead: TC-117 captures the sign-in round-trip time as a measurement so a limit can be attached once an owner sets one, and TC-119 confirms repeated failed attempts meet no throttle or lockout. TC-035 remains the client-side request timeout as a functional boundary.
 T-10 free-text input from an untrusted source — FIRED — TC-098 script, oversized, Unicode and control-character payloads, TC-014 whitespace-only input, TC-114 a role value planted in the address bar and in a second storage key
-T-11 token and session security edges — FIRED, BOUNDED — TC-037 unusable token, TC-065 expiry boundary and unreadable expiry, TC-073 observation past expiry, TC-074 no path back from an expired session, TC-083 post-logout replay measurement, TC-113 a session that dies while the protected screen is open, TC-115 the single authenticated write path into the session. Tampered-signature and cross-tenant probes were deliberately not generated: this client calls no protected route, and the platform's token validation behaviour is explicitly unchanged by this work, which TC-101 regression-anchors.
+T-11 token and session security edges — FIRED, BOUNDED — TC-037 unusable token, TC-065 expiry boundary and unreadable expiry, TC-073 observation past expiry, TC-074 no path back from an expired session, TC-083 post-logout replay measurement, TC-113 a session that dies while the protected screen is open, TC-129 an unreadable or inaccessible stored session, TC-131 a stored role no interaction can rewrite, TC-115 the single authenticated write path into the session. Tampered-signature and cross-tenant probes were deliberately not generated: this client calls no protected route, and the platform's token validation behaviour is explicitly unchanged by this work, which TC-101 regression-anchors.
 T-12 cross-origin policy — FIRED — TC-044, TC-045, TC-046, TC-069, TC-070, TC-100
 T-13 bi-directional navigation between screens — FIRED — TC-027, TC-060, TC-062, TC-066, TC-067, TC-107, TC-113
-T-14 alternate entry and fallback paths — FIRED — TC-064 opening the client with an already-expired session, TC-065, TC-074, TC-107 root-address resolution in both session states
-T-15 logout, cleanup and data retention — FIRED — TC-024, TC-042, TC-066, TC-067, TC-083
-T-16 accessibility depth — FIRED — TC-085, TC-086, TC-087, TC-088, TC-089, TC-090, TC-095, TC-057, TC-112
-T-17 form usability — FIRED — TC-017, TC-041, TC-108, TC-109, TC-110
+T-14 alternate entry and fallback paths — FIRED — TC-064 opening the client with an already-expired session, TC-065, TC-074, TC-107 root-address resolution in both session states, TC-129 the unreadable-storage fallback, TC-123 the Login screen entered cold rather than by redirect
+T-15 logout, cleanup and data retention — FIRED — TC-024, TC-042, TC-066, TC-067, TC-083, TC-130 which proves a refused visit writes and clears nothing
+T-16 accessibility depth — FIRED — TC-085, TC-086, TC-087, TC-088, TC-089, TC-090, TC-095, TC-057, TC-112, TC-122 the named logout control, TC-128 the invalid state attached to the offending field alone
+T-17 form usability — FIRED — TC-017, TC-041, TC-108, TC-109, TC-110, TC-126 the stale message cleared on the first keystroke, TC-127 the fields held read-only while the request is open
 T-18 regulated or personally identifying data — NOT APPLICABLE — no health, financial or otherwise regulated data class is named anywhere in the inputs. The only sensitive values this capability handles are the user's password and access token, whose confidentiality is covered by TC-010, TC-042, TC-096 and TC-099.
 
 BLOCK C — ASSUMPTIONS AND LIMITATIONS
-The client origin is pinned to http://localhost:5173; no port was fixed in the inputs and port 3000 is already taken by existing infrastructure. All four gateway configuration files now carry that same origin, so the allowed-origin cases are executable as written. Session expiry comes from the token's own claim; the response's expiry field has an unverified unit. No performance case exists: no latency or availability target was agreed and none was invented. TC-083 records the post-logout token replay as an accepted-risk measurement; its expected result is acceptance and it must never gate a pipeline. TC-111 and TC-112 are manual because the approved style assets were never supplied. TC-117 is tagged as a performance case only because the inputs require a recorded timing; it asserts no limit and must never gate a pipeline. TC-116 and TC-118 assert the analytics payloads against an allow-list of keys, so a newly added field fails by default. TC-119 rests on the platform catalogue recording no failed-attempt tracking and no lockout counter. No Dev, QA, Staging or Production frontend environment exists yet.";;;;;;;;;;;;;;;;;
+The client origin is pinned to http://localhost:5173; no port was fixed in the inputs and 3000 is taken by existing infrastructure. All four gateway configuration files carry that one origin. Expiry comes from the token's own claim; the response's expiry field has an unverified unit. No performance case exists — no target was agreed and none was invented; TC-117 records a timing only. TC-083 records the post-logout token replay as an accepted-risk measurement: the token stays valid at the platform level until it expires, so it must never gate a pipeline. TC-111 and TC-112 are manual because the approved style assets were never supplied. No Dev, QA, Staging or Production frontend environment exists yet, so no second origin is configured.";;;;;;;;;;;;;;;;;
