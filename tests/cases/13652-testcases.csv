@@ -2186,7 +2186,68 @@ Automation hint: none — this row is deliberately manual; judging whether annou
 Given both screens and all their states, when they are reviewed with a screen reader, then every element and message is announced clearly and with the correct urgency.";"Requirement IDs: AC-1, AC-3, AC-21, AC-26, FR-1, FR-3, FR-15, FR-18, DO1, DO2
 Jira: 13652
 Note: manual review; automated scanning cannot judge announcement coherence";Needs Review
-REVIEW-NOTES;Self-review summary;"BLOCK A — ACCEPTANCE CRITERIA COVERAGE (28 criteria, 112 test cases)
+TC-13652-113;Verify that the session is re-checked on every navigation and never reused;"A guard that caches its first verdict keeps a user inside the protected screen long after the session has died. This test opens the landing screen, lets the session expire while the screen is still open, then navigates to it again. The second navigation must be decided afresh rather than inherited from the first.";"1. The Pacco browser client is running locally at http://localhost:5173.
+2. The browser clock can be controlled by the test harness.
+3. A session can be seeded directly into browser storage by the test harness.";"Session at the first navigation = live, expiring two seconds from now
+Clock advance between the two navigations = five seconds
+Second navigation = the same landing address, reached from inside the running application without a full page reload
+Expected = allowed on the first navigation, denied on the second
+
+Automation hint: spy on the liveness check, assert its call count rises by one per navigation and assert the second verdict differs from the first.";"1. Seed a session that expires two seconds from now and open http://localhost:5173/welcome.
+2. Stay on the landing screen and advance the browser clock by five seconds without reloading the page.
+3. Navigate to the root address and back to the landing address from inside the running application.
+4. Read the recorded calls to the liveness check across both navigations.
+5. Request the landing address once more.";"1. The session is live and the landing screen renders.
+2. The screen stays exactly as it was; nothing re-renders on its own, because no background timer watches the session.
+3. The second navigation is denied: the user is taken to the Login screen with the session-expired notice and no landing element appears at any point, including transiently.
+4. The liveness check ran again for the second navigation; the first verdict was not reused and no cached answer was returned.
+5. The address is denied again with the same verdict, so the deny is stable rather than a one-off.";Every navigation to the protected screen is decided by a fresh liveness check, so a session that dies while the screen is open is caught on the very next navigation.;1. Restore the real clock and clear browser storage.;Pacco Login and Role-Aware Landing;Blocker;pacco-web-session;UI;Automatable;Security Testing;Security;Regression;"AC-20, AC-21
+Given a session that expires while the landing screen is open, when the landing address is requested again, then liveness is evaluated afresh and the user is taken to /login with the session-expired notice.";"Requirement IDs: AC-20, AC-21, FR-14, FR-15, DO2, N3
+Jira: 13652";Valid
+TC-13652-114;Verify that the welcome message follows the session role and ignores planted values;"The role held on the session is the only thing allowed to choose the welcome message. This test plants a contradicting administrator value in three places a careless implementation might read — a second storage key, the address bar and the identifier's local part — and confirms the rendered message still follows the session.";"1. The Pacco browser client is running locally at http://localhost:5173.
+2. The sign-in response can be controlled by the test harness.
+3. Browser storage and the address bar can be manipulated by the test harness.";"Identifier used to sign in = admin@pacco.example.com
+Role returned by the platform = user
+Planted value 1 = a separate browser storage key holding the administrator role value
+Planted value 2 = the address bar parameter ?role=admin
+Planted value 3 = the administrator local part of the identifier itself
+Expected heading in every case = ""Welcome""
+Forbidden anywhere in the rendered page = the text ""Admin Area""
+
+Automation hint: drive the three vectors as one parameterised render test asserting the heading text and asserting the administrator text is absent.";"1. Sign in as admin@pacco.example.com with a platform response carrying the ordinary role and reach the landing screen.
+2. Add a separate browser storage key holding the administrator role value and reload the landing screen.
+3. Open the landing address with the parameter ?role=admin appended.
+4. Present all three planted values at once and open the landing address.
+5. Read the role indicator alongside the heading in each of the states above.";"1. The landing screen renders the plain welcome heading; the administrator local part of the identifier changes nothing.
+2. The heading is still the plain welcome; the extra storage key is not read and the text ""Admin Area"" is absent from the page.
+3. The heading is still the plain welcome; the address bar parameter is ignored and the text ""Admin Area"" is absent from the page.
+4. With all three planted values present together the heading is still the plain welcome and the text ""Admin Area"" is absent from the page.
+5. The role indicator agrees with the heading in every case, so the two never disagree about the role.";The welcome message and the role indicator are sourced from the session role alone and are unmoved by a conflicting value planted in storage, in the address bar or in the identifier.;1. Remove the planted storage key and address bar parameter, log out and clear browser storage.;Pacco Login and Role-Aware Landing;Blocker;pacco-web-welcome;UI;Automatable;Security Testing;Security;Regression;"AC-18, AC-19
+Given a session whose role is user, when a conflicting administrator value is planted in another storage key, in a URL parameter or in the identifier, then the heading reads ""Welcome"" in every case.";"Requirement IDs: AC-18, AC-19, FR-12, FR-13, DO2, N4
+Jira: 13652";Valid
+TC-13652-115;Verify that the session is written from exactly one place after a success;"A second place that writes the session is a second chance to write one that was never authenticated. This test reads the source for every write of the session and confirms there is exactly one, sitting inside the branch reached only when a successful sign-in response has been parsed and accepted.";"1. A checkout of the browser client repository is available.";"Scan root = the client repository source tree
+Expected number of write call sites = exactly 1
+Permitted location = the success branch of the sign-in submission, after the response has been parsed and accepted
+Forbidden writers = the landing screen, the route guard, the logout control, the root-address resolver and any helper shipped in production code
+
+contract:
+  method: n/a — static source review, no HTTP request is issued
+  path: the session store and every module that imports it
+  assertion: the session write has exactly one call site and it sits in the parsed-success branch of the sign-in submission
+  expected_result: exactly one call site in the permitted location and zero writes from any other module
+
+Automation hint: enforce this with an architecture test that counts imports of the session write and fails above one.";"1. Check out the client repository at the branch under test.
+2. Find every module that imports the session write.
+3. Count the call sites of the session write across the whole source tree.
+4. Read the single call site and the branch it sits inside.
+5. Confirm that no landing, guard, logout or root-address module writes the session at all.";"1. The checkout completes and the source tree is present.
+2. Exactly one module imports the session write.
+3. Exactly one call site exists; no helper and no fallback path adds a second.
+4. The call site sits inside the branch reached only after a successful response has been parsed and accepted, so no other state can reach it.
+5. Zero writes originate outside the sign-in submission, so nothing after sign-in can create, replace or mutate the stored session.";The session can be written from exactly one place, reachable only by a parsed and accepted successful sign-in, so no later screen can create or alter a session.;1. None — read-only test.;Pacco Login and Role-Aware Landing;Blocker;pacco-web-session;API;Automatable;Security Testing;Security;Regression;"AC-8, AC-12
+Given the client source, when every write of the session is reviewed, then exactly one call site exists and it sits in the branch reached only by a parsed successful sign-in response.";"Requirement IDs: AC-8, AC-12, FR-7, FR-8, DO1, DO2, N3
+Jira: 13652";Valid
+REVIEW-NOTES;Self-review summary;"BLOCK A — ACCEPTANCE CRITERIA COVERAGE (28 criteria, 115 test cases)
 
 | Acceptance Criterion | Verdict | Test Cases | Notes |
 | --- | --- | --- | --- |
@@ -2197,20 +2258,20 @@ REVIEW-NOTES;Self-review summary;"BLOCK A — ACCEPTANCE CRITERIA COVERAGE (28 c
 | AC-5 submit lock released on network failure | Full | TC-016, TC-034, TC-039 | — |
 | AC-6 only the gateway address is contacted, source scan for stray hosts | Full | TC-018, TC-019, TC-020, TC-082, TC-100, TC-104, TC-105 | — |
 | AC-7 secret scan clean, no pre-filled fields | Full | TC-007, TC-021, TC-022 | — |
-| AC-8 session holds token, lower-cased role, token-derived expiry, user on landing | Full | TC-019, TC-023, TC-024, TC-025, TC-026, TC-027, TC-075, TC-082, TC-106 | — |
+| AC-8 session holds token, lower-cased role, token-derived expiry, user on landing | Full | TC-019, TC-023, TC-024, TC-025, TC-026, TC-027, TC-075, TC-082, TC-106, TC-115 | — |
 | AC-9 credential rejection shows the fixed message, no reason or status leaks | Full | TC-028, TC-032, TC-038, TC-077, TC-098 | — |
 | AC-10 unrecognised address gives the same message, no echo | Full | TC-029, TC-078 | — |
 | AC-11 unreachable or failing platform gives the availability message, no session | Full | TC-033, TC-034, TC-035, TC-039, TC-081 | — |
-| AC-12 malformed success gives the generic message, no session, stays on login | Full | TC-030, TC-031, TC-036, TC-037, TC-040, TC-098 | — |
+| AC-12 malformed success gives the generic message, no session, stays on login | Full | TC-030, TC-031, TC-036, TC-037, TC-040, TC-098, TC-115 | — |
 | AC-13 identifier retained, password cleared, retry succeeds without reload | Full | TC-041, TC-077 | — |
 | AC-14 password absent from console, storage and telemetry | Full | TC-042, TC-043, TC-096, TC-099 | — |
 | AC-15 four gateway files byte-identical, exactly one concrete origin | Full | TC-044 | — |
 | AC-16 allowed origin accepted, other origin rejected | Full | TC-045, TC-046, TC-100 | — |
 | AC-17 role admin in any case gives the administrator heading | Full | TC-047, TC-048, TC-049, TC-056, TC-076, TC-084, TC-106 | — |
-| AC-18 user, empty, whitespace, absent, administrator, superuser give the plain heading | Full | TC-026, TC-050, TC-051, TC-052, TC-053, TC-054, TC-055, TC-056, TC-057, TC-075, TC-084, TC-097 | — |
-| AC-19 admin-prefixed address with an ordinary role gives the plain heading | Full | TC-058, TC-059 | — |
-| AC-20 no session redirects and the landing screen never renders | Full | TC-060, TC-061, TC-062, TC-084, TC-106, TC-107 | — |
-| AC-21 expired session discarded, returned to login with a distinct notice | Full | TC-064, TC-065, TC-074, TC-089, TC-112 | — |
+| AC-18 user, empty, whitespace, absent, administrator, superuser give the plain heading | Full | TC-026, TC-050, TC-051, TC-052, TC-053, TC-054, TC-055, TC-056, TC-057, TC-075, TC-084, TC-097, TC-114 | — |
+| AC-19 admin-prefixed address with an ordinary role gives the plain heading | Full | TC-058, TC-059, TC-114 | — |
+| AC-20 no session redirects and the landing screen never renders | Full | TC-060, TC-061, TC-062, TC-084, TC-106, TC-107, TC-113 | — |
+| AC-21 expired session discarded, returned to login with a distinct notice | Full | TC-064, TC-065, TC-074, TC-089, TC-112, TC-113 | — |
 | AC-22 logout issues zero requests, store empty, token absent, user on login | Full | TC-066, TC-083, TC-084, TC-088 | — |
 | AC-23 back after logout lands on login | Full | TC-067, TC-068 | — |
 | AC-24 the only changed gateway key is the allowed-origin list | Full | TC-069, TC-101 | — |
@@ -2231,10 +2292,10 @@ T-6 asynchronous event publication — FIRED — TC-103, which confirms the exis
 T-7 data flowing across module boundaries — FIRED — TC-023, TC-027, TC-082, TC-106
 T-8 responsive and multi-viewport rendering — FIRED — TC-091 at 320 pixels, TC-092 at 390 by 844, TC-093 at 768 by 1024, TC-094 at 1280 and 1920, TC-095 at double magnification
 T-9 rate limiting and performance targets — NOT APPLICABLE — the inputs define no rate limit on the sign-in route, and they state explicitly that no latency or availability target has been agreed for this capability and that none is to be invented. No performance test case was generated. The only timing-related observation that does exist is recorded in TC-035 as a functional timeout boundary.
-T-10 free-text input from an untrusted source — FIRED — TC-098 script, oversized, Unicode and control-character payloads, TC-014 whitespace-only input
-T-11 token and session security edges — FIRED, BOUNDED — TC-037 unusable token, TC-065 expiry boundary and unreadable expiry, TC-073 observation past expiry, TC-074 no path back from an expired session, TC-083 post-logout replay measurement. Tampered-signature and cross-tenant probes were deliberately not generated: this client calls no protected route, and the platform's token validation behaviour is explicitly unchanged by this work, which TC-101 regression-anchors.
+T-10 free-text input from an untrusted source — FIRED — TC-098 script, oversized, Unicode and control-character payloads, TC-014 whitespace-only input, TC-114 a role value planted in the address bar and in a second storage key
+T-11 token and session security edges — FIRED, BOUNDED — TC-037 unusable token, TC-065 expiry boundary and unreadable expiry, TC-073 observation past expiry, TC-074 no path back from an expired session, TC-083 post-logout replay measurement, TC-113 a session that dies while the protected screen is open, TC-115 the single authenticated write path into the session. Tampered-signature and cross-tenant probes were deliberately not generated: this client calls no protected route, and the platform's token validation behaviour is explicitly unchanged by this work, which TC-101 regression-anchors.
 T-12 cross-origin policy — FIRED — TC-044, TC-045, TC-046, TC-069, TC-070, TC-100
-T-13 bi-directional navigation between screens — FIRED — TC-027, TC-060, TC-062, TC-066, TC-067, TC-107
+T-13 bi-directional navigation between screens — FIRED — TC-027, TC-060, TC-062, TC-066, TC-067, TC-107, TC-113
 T-14 alternate entry and fallback paths — FIRED — TC-064 opening the client with an already-expired session, TC-065, TC-074, TC-107 root-address resolution in both session states
 T-15 logout, cleanup and data retention — FIRED — TC-024, TC-042, TC-066, TC-067, TC-083
 T-16 accessibility depth — FIRED — TC-085, TC-086, TC-087, TC-088, TC-089, TC-090, TC-095, TC-057, TC-112
@@ -2242,4 +2303,4 @@ T-17 form usability — FIRED — TC-017, TC-041, TC-108, TC-109, TC-110
 T-18 regulated or personally identifying data — NOT APPLICABLE — no health, financial or otherwise regulated data class is named anywhere in the inputs. The only sensitive values this capability handles are the user's password and access token, whose confidentiality is covered by TC-010, TC-042, TC-096 and TC-099.
 
 BLOCK C — ASSUMPTIONS AND LIMITATIONS
-The client origin is pinned to http://localhost:5173; no port was fixed in the inputs and port 3000 is already taken by existing infrastructure. Review flag: the four gateway configuration files still carry 3000, so the allowed-origin cases fail until the gateway is aligned. Session expiry comes from the token's own claim; the response's expiry field has an unverified unit. No performance case exists: no latency or availability target was agreed and none was invented. TC-083 records the post-logout token replay as an accepted-risk measurement; its expected result is acceptance and it must never gate a pipeline. TC-111 and TC-112 are manual because the approved style assets were never supplied. No Dev, QA, Staging or Production frontend environment exists yet.";;;;;;;;;;;;;;;;;
+The client origin is pinned to http://localhost:5173; no port was fixed in the inputs and port 3000 is already taken by existing infrastructure. All four gateway configuration files now carry that same origin, so the allowed-origin cases are executable as written. Session expiry comes from the token's own claim; the response's expiry field has an unverified unit. No performance case exists: no latency or availability target was agreed and none was invented. TC-083 records the post-logout token replay as an accepted-risk measurement; its expected result is acceptance and it must never gate a pipeline. TC-111 and TC-112 are manual because the approved style assets were never supplied. No Dev, QA, Staging or Production frontend environment exists yet.";;;;;;;;;;;;;;;;;
