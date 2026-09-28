@@ -1,7 +1,7 @@
 # Pacco.Web — JIRA 13652 automation suite
 
 TypeScript + Playwright. One test method per functional row of
-`tests/cases/13652-testcases.csv` — 112 rows, 112 methods.
+`tests/cases/13652-testcases.csv` — 131 rows, 131 methods.
 
 This suite is self-contained: it has its own `package.json`, its own
 `node_modules`, and its own `.gitignore`. It never builds, serves or embeds the
@@ -13,11 +13,16 @@ browser client. The client runs as its own local process; the suite drives it.
 
 ```bash
 cd tests/automation/13652/typescript-playwright
-npm install
+npm ci
 npm run install:browsers
 ```
 
 Node 20.19 or newer is required (`engines` in `package.json`).
+
+`package-lock.json` is committed, so `npm ci` is the install command everywhere
+— locally, in the Docker image and in CI. `package.json` also pins
+`playwright-core` through `overrides`; without that pin `@axe-core/playwright`
+pulls in a second copy and the suite stops typechecking.
 
 ## Configure
 
@@ -28,11 +33,11 @@ the committed record of every variable the suite reads.
 cp .env.example .env
 ```
 
-Thirteen variables have **no default** — the suite refuses to start without
+Fourteen variables have **no default** — the suite refuses to start without
 them rather than falling back to a credential baked into source. They are the
-synthetic account addresses and passwords and the three canary values.
-`playwright.config.ts` calls `validateEnvConfig()` at load time and lists every
-missing name in one message.
+synthetic account addresses and passwords, the wrong-passphrase sequence
+TC-13652-119 needs, and the three canary values. `playwright.config.ts` calls
+`validateEnvConfig()` at load time and lists every missing name in one message.
 
 The values shipped in `.env.example` are synthetic fixtures, not real
 credentials. Replace them with whatever your local platform actually accepts
@@ -40,33 +45,42 @@ before running the `live-platform` project.
 
 Addresses the suite needs:
 
-| Variable | Meaning |
-| --- | --- |
-| `PACCO_WEB_BASE_URL` | Where the browser client is served locally |
-| `PACCO_GATEWAY_BASE_URL` | The single local API Gateway |
-| `PACCO_SIGN_IN_PATH` | The gateway's sign-in route |
-| `PACCO_PROTECTED_ROUTE_PATH` | Any route the gateway protects, for the regression rows |
-| `PACCO_DISALLOWED_ORIGIN_URL` | An origin the gateway must refuse |
+| Variable                      | Meaning                                                 |
+| ----------------------------- | ------------------------------------------------------- |
+| `PACCO_WEB_BASE_URL`          | Where the browser client is served locally              |
+| `PACCO_GATEWAY_BASE_URL`      | The single local API Gateway                            |
+| `PACCO_SIGN_IN_PATH`          | The gateway's sign-in route                             |
+| `PACCO_PROTECTED_ROUTE_PATH`  | Any route the gateway protects, for the regression rows |
+| `PACCO_DISALLOWED_ORIGIN_URL` | An origin the gateway must refuse                       |
 
 There are currently no separate Dev, QA, Staging or Production frontend
 environments. Everything here points at local processes; other origins,
 gateway addresses and DNS names are to be defined when those environments
 exist.
 
+Timing and repetition counts are configuration too, so a slower machine is
+tuned rather than patched. `PACCO_TELEMETRY_HOLD_MS` and
+`PACCO_IN_FLIGHT_HOLD_MS` say how long a stubbed response is held open while a
+mid-flight state is read; `PACCO_SHORT_SESSION_SECONDS` and
+`PACCO_CLOCK_ADVANCE_MS` drive the expiry rows; `PACCO_LATENCY_SAMPLES`,
+`PACCO_FAILED_ATTEMPTS` and `PACCO_DUPLICATE_CLICKS` say how many times the
+repetition rows repeat. None of them is a sleep — every wait in the suite is
+still an assertion or an event.
+
 ## Run
 
 The suite is split into five Playwright projects. Each row's own CSV layer
 decides which project runs it, through the `@layer:` tag in its title.
 
-| Command | Project | What it runs |
-| --- | --- | --- |
-| `npm run test:static` | `static-analysis` | Rows that read the checkout, not a browser |
-| `npm run test:api` | `api` | The client↔gateway contract, against a stubbed edge |
-| `npm run test:ui` | `ui` | The screens |
-| `npm run test:a11y` | `a11y` | axe scans, keyboard and contrast |
-| `npm run test:offline` | all four above | Everything that needs no running platform |
-| `npm run test:live` | `live-platform` | Rows tagged `@live` |
-| `npm test` | all five | Everything |
+| Command                | Project           | What it runs                                         |
+| ---------------------- | ----------------- | ---------------------------------------------------- |
+| `npm run test:static`  | `static-analysis` | Rows that read the checkout, not a browser           |
+| `npm run test:api`     | `api`             | The client↔gateway contract, against a stubbed edge |
+| `npm run test:ui`      | `ui`              | The screens                                          |
+| `npm run test:a11y`    | `a11y`            | axe scans, keyboard and contrast                     |
+| `npm run test:offline` | all four above    | Everything that needs no running platform            |
+| `npm run test:live`    | `live-platform`   | Rows tagged `@live`                                  |
+| `npm test`             | all five          | Everything                                           |
 
 ### What each project needs
 
@@ -98,11 +112,11 @@ docker compose -f infrastructure.yml -f services.yml up -d
 
 Point the suite at the checkouts if they are not siblings of this repository:
 
-| Variable | Used by |
-| --- | --- |
-| `PACCO_COMPOSE_DIR` | Starting and stopping services (TC-081, TC-103, TC-104) |
-| `PACCO_GATEWAY_CONFIG_DIR` | Reading the four Ntrada files (TC-044, TC-069) |
-| `PACCO_GATEWAY_BASELINE_REV` | The revision TC-069 diffs against |
+| Variable                     | Used by                                                 |
+| ---------------------------- | ------------------------------------------------------- |
+| `PACCO_COMPOSE_DIR`          | Starting and stopping services (TC-081, TC-103, TC-104) |
+| `PACCO_GATEWAY_CONFIG_DIR`   | Reading the four Ntrada files (TC-044, TC-069)          |
+| `PACCO_GATEWAY_BASELINE_REV` | The revision TC-069 diffs against                       |
 
 TC-13652-081 stops and restarts `PACCO_SIGNIN_SERVICE_NAME` through
 `docker compose`, then starts it again in a `finally` block. If it is
@@ -120,13 +134,13 @@ npx playwright test --grep "TC-13652-035"     # one row
 
 ## Reports
 
-| Path | Contents |
-| --- | --- |
-| `reports/html/` | The Playwright HTML report — `npm run report` |
-| `reports/junit/results.xml` | JUnit XML for CI |
-| `reports/json/results.json` | Machine-readable results |
-| `reports/artifacts/` | Traces, screenshots and videos from failures |
-| `reports/a11y/` | `npm run a11y:scan` output |
+| Path                        | Contents                                      |
+| --------------------------- | --------------------------------------------- |
+| `reports/html/`             | The Playwright HTML report — `npm run report` |
+| `reports/junit/results.xml` | JUnit XML for CI                              |
+| `reports/json/results.json` | Machine-readable results                      |
+| `reports/artifacts/`        | Traces, screenshots and videos from failures  |
+| `reports/a11y/`             | `npm run a11y:scan` output                    |
 
 A failing test attaches its correlation id, the requests it issued, the
 addresses it visited, the console output and the telemetry it captured. All of
@@ -156,7 +170,7 @@ The ESLint configuration enforces three suite rules beyond the usual set:
 
 - no fixed delays anywhere — no `waitForTimeout`, no `setTimeout`, no
   hand-rolled sleep. `support/responseDelay.ts` holds the single exception, and
-  it exists only to make a stubbed response *slow*, never to synchronise a test;
+  it exists only to make a stubbed response _slow_, never to synchronise a test;
 - no absolute addresses, credential-shaped literals or e-mail addresses in
   spec or page-object code — they belong in `.env`;
 - page objects stay declarative. `pages/**` may expose locators and nothing

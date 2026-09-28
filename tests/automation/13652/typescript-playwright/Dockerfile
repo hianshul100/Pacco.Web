@@ -26,10 +26,15 @@ ENV NODE_ENV=test \
 WORKDIR /suite
 
 # Dependency layer first so source edits do not re-resolve the tree.
-COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install --no-package-lock; fi
+# `npm ci` only: the lockfile is committed, so the image is reproducible.
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY tsconfig.json playwright.config.ts eslint.config.js .prettierrc.json ./
+# Synthetic fixture values, so `docker run` without --env-file still starts and
+# reports a real failure instead of a wall of missing-variable errors. Nothing
+# here is a credential; see the file's own header.
+COPY .env.example ./
 COPY config ./config
 COPY support ./support
 COPY pages ./pages

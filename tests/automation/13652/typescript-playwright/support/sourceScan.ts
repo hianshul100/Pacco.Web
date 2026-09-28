@@ -91,10 +91,7 @@ export interface ScanHit {
 }
 
 /** Every line in every file that matches `pattern`. */
-export function findInSources(
-  files: readonly SourceFile[],
-  pattern: RegExp,
-): readonly ScanHit[] {
+export function findInSources(files: readonly SourceFile[], pattern: RegExp): readonly ScanHit[] {
   const hits: ScanHit[] = []
   for (const file of files) {
     const lines = file.text.split('\n')
@@ -155,7 +152,11 @@ export function readGatewayConfig(configDir: string | null, fileName: string): s
  * when the revision or the path is unknown, which is how the regression rows
  * skip cleanly in a shallow checkout.
  */
-export function readAtRevision(repoDir: string, revision: string, relativePath: string): string | null {
+export function readAtRevision(
+  repoDir: string,
+  revision: string,
+  relativePath: string,
+): string | null {
   try {
     return execFileSync('git', ['-C', repoDir, 'show', `${revision}:${relativePath}`], {
       encoding: 'utf8',
@@ -189,13 +190,22 @@ export function directoryHasContent(path: string): boolean {
 
 /** Anything that looks like a committed secret. Used by TC-021 and TC-022. */
 export const SECRET_PATTERNS: ReadonlyArray<{ readonly name: string; readonly pattern: RegExp }> = [
-  { name: 'assigned password', pattern: /\b(password|passwd|pwd|passphrase)\s*[:=]\s*['"][^'"]{4,}['"]/i },
-  { name: 'assigned api key', pattern: /\b(api[_-]?key|apikey|secret|client[_-]?secret)\s*[:=]\s*['"][^'"]{8,}['"]/i },
+  {
+    name: 'assigned password',
+    pattern: /\b(password|passwd|pwd|passphrase)\s*[:=]\s*['"][^'"]{4,}['"]/i,
+  },
+  {
+    name: 'assigned api key',
+    pattern: /\b(api[_-]?key|apikey|secret|client[_-]?secret)\s*[:=]\s*['"][^'"]{8,}['"]/i,
+  },
   { name: 'bearer literal', pattern: /['"]Bearer\s+[A-Za-z0-9._~+/-]{10,}=*['"]/ },
   { name: 'json web token literal', pattern: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\./ },
   { name: 'private key block', pattern: /-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/ },
   { name: 'aws access key id', pattern: /\bAKIA[0-9A-Z]{16}\b/ },
-  { name: 'connection string with credentials', pattern: /\b[a-z+]{3,}:\/\/[^\s'":/]+:[^\s'"@/]+@/i },
+  {
+    name: 'connection string with credentials',
+    pattern: /\b[a-z+]{3,}:\/\/[^\s'":/]+:[^\s'"@/]+@/i,
+  },
 ]
 
 /** Any absolute http(s) address literal. Used by TC-020 and TC-022. */

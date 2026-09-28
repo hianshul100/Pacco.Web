@@ -49,7 +49,9 @@ export default defineConfig({
   // A stray `test.only` must never silently shrink a CI run.
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // `exactOptionalPropertyTypes` forbids passing the key across as `undefined`,
+  // so off CI the key is simply absent and Playwright applies its own default.
+  ...(process.env.CI === undefined ? {} : { workers: 2 }),
 
   reporter: [
     ['list'],

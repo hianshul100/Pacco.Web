@@ -22,7 +22,6 @@ export function holdResponse(milliseconds: number): Promise<void> {
     throw new Error(`holdResponse needs a non-negative integer, got ${String(milliseconds)}.`)
   }
   return new Promise<void>((settle) => {
-    // eslint-disable-next-line no-restricted-syntax -- simulated server latency; see the file header.
     setTimeout(settle, milliseconds)
   })
 }

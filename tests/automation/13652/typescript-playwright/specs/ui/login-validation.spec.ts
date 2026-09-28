@@ -1,18 +1,13 @@
 /**
  * Client-side validation and the submit lock.
  *
- * Source rows: TC-13652-011 … TC-13652-017.
+ * Source rows: TC-13652-011 … TC-13652-017, TC-13652-127.
  *
  * Every row here counts requests. The count comes from the traffic recorder,
  * which sees what the browser issued, so "blocked before any request" is
  * asserted against the wire rather than inferred from a message appearing.
  */
-import {
-  clickRepeatedly,
-  fillCredentials,
-  openPath,
-  submitSignIn,
-} from '../../support/actions'
+import { clickRepeatedly, fillCredentials, openPath, submitSignIn } from '../../support/actions'
 import { LOGIN_COPY, MESSAGES, ROUTES } from '../../support/expectedCopy'
 import { expect, test } from '../../support/fixtures'
 import { WHITESPACE_IDENTIFIER, WHITESPACE_PASSWORD } from '../../support/testData'
@@ -186,5 +181,75 @@ test.describe('Login validation and submit lock @story:13652 @component:pacco-we
     // Once the attempt settles, both states are removed. The success navigates
     // away, so the assertion is that the busy control does not survive.
     await expect(loginPage.submit).toHaveCount(0)
+  })
+
+  test('TC-13652-127 Verify that both fields are read-only while a sign-in request is in flight @layer:ui @ac:AC-4 @intent:regression', async ({
+    env,
+    page,
+    loginPage,
+    signInStub,
+    traffic,
+  }) => {
+    const submitted = {
+      identifier: env.accounts.other.email,
+      password: env.accounts.other.password,
+    }
+
+    // ⚠️ A held REJECTION, not a held success. A success unmounts this screen
+    // the moment it lands, and step 5 - "both fields are editable again" -
+    // would then have nothing left to read.
+    await signInStub.rejectSlowly(
+      env.timeouts.inFlightHoldMs,
+      'invalid_credentials',
+      'Invalid credentials.',
+    )
+
+    await fillCredentials(loginPage, submitted)
+    traffic.clear()
+    signInStub.reset()
+
+    // --- Step 1: the request is open --------------------------------------
+    await submitSignIn(loginPage)
+    await expect(loginPage.submit).toHaveAttribute('aria-busy', 'true')
+    await expect.poll(() => traffic.signIn().length).toBe(1)
+
+    // --- Steps 2 and 3: typing is attempted into each field ---------------
+    // Driven through the raw keyboard rather than `fill`, which would refuse a
+    // read-only field before a keystroke was ever delivered - the row asks what
+    // the screen does with the keystrokes, not what the harness does.
+    await loginPage.identifier.focus()
+    await page.keyboard.type('zzz')
+    await expect(loginPage.identifier).toHaveValue(submitted.identifier)
+
+    await loginPage.password.focus()
+    await page.keyboard.type('zzz')
+    await expect(loginPage.password).toHaveValue(submitted.password)
+
+    // --- Step 4: the in-flight state --------------------------------------
+    await expect(loginPage.identifier).not.toBeEditable()
+    await expect(loginPage.password).not.toBeEditable()
+    await expect(loginPage.identifier).toHaveAttribute('readonly', '')
+    await expect(loginPage.password).toHaveAttribute('readonly', '')
+    await expect(loginPage.submit).toHaveAttribute('aria-disabled', 'true')
+    await expect(loginPage.submit).toHaveAttribute('aria-busy', 'true')
+    await expect(loginPage.submit).toBeDisabled()
+    await expect(loginPage.submit).toHaveText(LOGIN_COPY.submitProcessing)
+    // Nothing the user typed was sent: still one request, still the submitted
+    // values in its body.
+    expect(traffic.signIn(), 'the held request must be the only one').toHaveLength(1)
+    expect(
+      (traffic.signIn()[0]?.postData ?? '').includes('zzz'),
+      'the discarded keystrokes must never reach the wire',
+    ).toBe(false)
+
+    // --- Step 5: the response settles -------------------------------------
+    await expect(loginPage.formMessage).toHaveText(MESSAGES.credentials)
+    await expect(loginPage.identifier).toBeEditable()
+    await expect(loginPage.password).toBeEditable()
+    await expect(loginPage.submit).toBeEnabled()
+    await expect(loginPage.submit).toHaveAttribute('aria-busy', 'false')
+    await expect(loginPage.submit).toHaveText(LOGIN_COPY.submit)
+    // The screen is never left locked: the address survives for a retry.
+    await expect(loginPage.identifier).toHaveValue(submitted.identifier)
   })
 })

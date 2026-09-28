@@ -93,7 +93,12 @@ export function redact(value: unknown, depth = 0): unknown {
     }
     return output
   }
-  return String(value)
+  if (typeof value === 'bigint') {
+    return `${value.toString()}n`
+  }
+  // Only symbols and functions reach here. Neither has a useful textual form,
+  // and neither belongs in a log line, so record the kind and drop the value.
+  return `[${typeof value}]`
 }
 
 export interface Logger {

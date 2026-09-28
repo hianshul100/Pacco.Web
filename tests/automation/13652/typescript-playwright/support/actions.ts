@@ -5,7 +5,7 @@
  * plain sequence of Playwright calls with no assertions and no fixed delays -
  * a caller that needs to wait for an outcome waits on that outcome.
  */
-import type { Page, Response } from '@playwright/test'
+import type { Locator, Page, Response } from '@playwright/test'
 
 import type { LoginPage } from '../pages/LoginPage'
 import type { WelcomePage } from '../pages/WelcomePage'
@@ -41,7 +41,10 @@ export async function fillCredentials(login: LoginPage, credentials: Credentials
 }
 
 /** Submits the form by the requested route. */
-export async function submitSignIn(login: LoginPage, method: SubmitMethod = 'button'): Promise<void> {
+export async function submitSignIn(
+  login: LoginPage,
+  method: SubmitMethod = 'button',
+): Promise<void> {
   switch (method) {
     case 'button':
       await login.submit.click()
@@ -142,18 +145,51 @@ export async function enterAddress(page: Page, path: string): Promise<void> {
  * suppression rows; the interval is driven by the CSV, not by a sleep - the
  * clicks are issued back to back and the stub holds the response open.
  */
-export async function clickRepeatedly(
-  login: LoginPage,
-  times: number,
-): Promise<void> {
+export async function clickRepeatedly(login: LoginPage, times: number): Promise<void> {
   for (let index = 0; index < times; index += 1) {
-    // `force` because the control becomes disabled after the first click and
-    // the row's whole point is that the later clicks must change nothing.
-    await login.submit.click({ force: true, noWaitAfter: true }).catch(() => {
-      // A click the browser refuses because the control is disabled is itself
-      // the expected behaviour; it must not end the loop.
-    })
+    // Resolved by element type, not by accessible name. `LoginCard` renames the
+    // control to "Signing in…" for the duration of the request, so a
+    // name-matched locator would stop resolving after the first click and the
+    // later clicks would silently never reach the handler - which is precisely
+    // the behaviour these rows exist to measure.
+    //
+    // `force` because the control carries `aria-disabled` while submitting.
+    await login.submitControls
+      .first()
+      .click({ force: true, noWaitAfter: true })
+      .catch(() => {
+        // A click the browser refuses is itself the expected behaviour; it
+        // must not end the loop.
+      })
   }
+}
+
+/**
+ * Navigates within the running application, the way a link would, without
+ * fetching a new document.
+ *
+ * The landing screen offers no in-app navigation of its own - TC-122 asserts
+ * the top bar holds a brand mark and a Logout control and nothing else - so a
+ * row that has to prove "the session is re-checked on every navigation, not
+ * once at load" cannot use a link and must not use `page.goto`, which would
+ * reload and re-run the whole bootstrap. Pushing a history entry and letting
+ * react-router pick it up is the closest equivalent to a client-side
+ * navigation that this screen can produce.
+ */
+export async function navigateInApp(page: Page, path: string): Promise<void> {
+  await page.evaluate((target: string) => {
+    window.history.pushState({}, '', target)
+    window.dispatchEvent(new PopStateEvent('popstate', { state: {} }))
+  }, path)
+}
+
+/**
+ * Types a single character into a field, as a keystroke rather than a value
+ * assignment, and leaves whatever was already there in place.
+ */
+export async function typeCharacter(field: Locator, character: string): Promise<void> {
+  await field.focus()
+  await field.press(character)
 }
 
 /** The logout control's accessible name, for specs that need it inline. */
