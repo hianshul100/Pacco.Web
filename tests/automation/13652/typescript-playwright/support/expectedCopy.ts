@@ -28,8 +28,18 @@ export const LOGIN_COPY = {
 
 export const LANDING_COPY = {
   adminHeading: 'Welcome to Admin Area',
+  /**
+   * The administrator-only phrase. TC-114 forbids it anywhere in the rendered
+   * page, which is a stronger claim than "the admin heading is absent".
+   */
+  adminEmphasis: 'Admin Area',
   standardHeading: 'Welcome',
   supporting: 'You are signed in successfully.',
+  /** The guidance line beneath the divider (TC-121, TC-122). */
+  closing: 'Use the navigation to continue.',
+  /** The role chip's two labels (TC-114, TC-120). */
+  chipAdmin: 'Admin',
+  chipStandard: 'User',
   logout: 'Logout',
 } as const
 

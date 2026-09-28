@@ -1,20 +1,29 @@
 /**
  * The role-aware landing message.
  *
- * Source rows: TC-13652-047 … TC-13652-058.
+ * Source rows: TC-13652-047 … TC-13652-058, TC-13652-114, TC-13652-131.
  *
  * Exactly one role value produces the administrator wording. Everything else -
  * unknown roles, blank roles, roles that merely begin with the same letters -
  * produces the ordinary one. Most of these rows are anti-prefix-match probes,
  * which is why they are spelled out individually rather than folded together.
  */
-import { openPath } from '../../support/actions'
+import {
+  goBack,
+  goForward,
+  hardReload,
+  navigateInApp,
+  openPath,
+  signIn,
+} from '../../support/actions'
 import { LANDING_COPY, ROUTES, SESSION_STORAGE_KEY } from '../../support/expectedCopy'
 import { expect, test } from '../../support/fixtures'
 import { seedRawSession, seedSession } from '../../support/sessionSeed'
 import { readStoredSession } from '../../support/sweep'
 import {
   ADMIN_SHAPED_LOCAL_PARTS,
+  PLANTED_ADMIN_VALUE,
+  PLANTED_SESSION_KEY,
   ROLE_AGREEMENT_CASES,
   WHITESPACE_ROLES,
 } from '../../support/testData'
@@ -134,10 +143,7 @@ test.describe('Role-aware landing @story:13652 @component:pacco-web-login', () =
     await openPath(page, ROUTES.welcome)
     await expect(welcomePage.standardHeading).toHaveText(LANDING_COPY.standardHeading)
 
-    expect(
-      consoleLog.pageErrors(),
-      'a missing role must not raise an uncaught error',
-    ).toEqual([])
+    expect(consoleLog.pageErrors(), 'a missing role must not raise an uncaught error').toEqual([])
   })
 
   test('TC-13652-054 Verify that the role administrator does not render the administrator welcome message @layer:ui @ac:AC-18 @intent:regression', async ({
@@ -185,9 +191,10 @@ test.describe('Role-aware landing @story:13652 @component:pacco-web-login', () =
       await openPath(page, ROUTES.welcome)
 
       const heading = welcomePage.heading
-      await expect(heading, `role "${roleCase.returned}" must render its documented heading`).toHaveText(
-        roleCase.heading,
-      )
+      await expect(
+        heading,
+        `role "${roleCase.returned}" must render its documented heading`,
+      ).toHaveText(roleCase.heading)
 
       const indicator = (await welcomePage.roleIndicator.textContent()) ?? ''
       const indicatorSaysAdmin = /\badmin\b/i.test(indicator)
@@ -252,5 +259,153 @@ test.describe('Role-aware landing @story:13652 @component:pacco-web-login', () =
     await openPath(page, ROUTES.welcomeWithRoleParam)
     await expect(welcomePage.standardHeading).toHaveText(LANDING_COPY.standardHeading)
     await expect(welcomePage.adminHeading).toHaveCount(0)
+  })
+
+  test('TC-13652-114 Verify that the welcome message follows the session role and ignores planted values @layer:ui @ac:AC-18 @ac:AC-19 @intent:regression', async ({
+    env,
+    page,
+    loginPage,
+    welcomePage,
+    signInStub,
+  }) => {
+    /** Asserts the ordinary presentation, whatever was planted. */
+    const assertOrdinaryPresentation = async (state: string): Promise<void> => {
+      await expect(
+        welcomePage.standardHeading,
+        `${state}: the heading must stay the plain welcome`,
+      ).toHaveText(LANDING_COPY.standardHeading)
+      await expect(welcomePage.adminHeading, `${state}: no administrator heading`).toHaveCount(0)
+
+      // Stronger than "the admin heading is absent": the phrase must not be
+      // anywhere in the rendered page, in any element.
+      const rendered = await page.locator('body').innerText()
+      expect(rendered, `${state}: "${LANDING_COPY.adminEmphasis}" must not appear`).not.toContain(
+        LANDING_COPY.adminEmphasis,
+      )
+
+      // Expected result 5: the indicator and the heading never disagree.
+      await expect(
+        welcomePage.roleIndicator,
+        `${state}: the role indicator must agree with the heading`,
+      ).toHaveText(LANDING_COPY.chipStandard)
+    }
+
+    // Step 1: an administrator-shaped identifier, an ordinary role.
+    await signInStub.succeed({ role: 'user' })
+    await openPath(page, ROUTES.login)
+    await signIn(loginPage, {
+      identifier: env.accounts.adminShapedEmail,
+      password: env.accounts.standard.password,
+    })
+    await assertOrdinaryPresentation('an administrator-shaped identifier')
+
+    // Step 2: a second storage key holding the administrator role value.
+    await page.evaluate(
+      ([key, value]: [string, string]) => {
+        window.sessionStorage.setItem(key, value)
+        window.localStorage.setItem(key, value)
+      },
+      [PLANTED_SESSION_KEY, PLANTED_ADMIN_VALUE] as [string, string],
+    )
+    await openPath(page, ROUTES.welcome)
+    await assertOrdinaryPresentation('a planted second storage key')
+
+    // Step 3: the address bar parameter.
+    await openPath(page, ROUTES.welcomeWithRoleParam)
+    await assertOrdinaryPresentation('a planted address-bar parameter')
+
+    // Step 4: all three at once - the planted keys survived the reloads, the
+    // identifier is still the administrator-shaped one, and the parameter is
+    // back on the address.
+    const planted = await page.evaluate(
+      (key: string) => window.sessionStorage.getItem(key),
+      PLANTED_SESSION_KEY,
+    )
+    expect(planted, 'the planted key must still be present for the combined state').toBe(
+      PLANTED_ADMIN_VALUE,
+    )
+    await openPath(page, ROUTES.welcomeWithRoleParam)
+    await assertOrdinaryPresentation('all three planted values together')
+
+    // And the session the platform issued is untouched by any of it.
+    expect(
+      (await readStoredSession(page, SESSION_STORAGE_KEY))?.role,
+      'the session role is the only source, and it did not change',
+    ).toBe('user')
+  })
+
+  test('TC-13652-131 Verify that the stored role is unchanged by every landing screen interaction @layer:ui @ac:AC-17 @ac:AC-18 @ac:AC-19 @intent:regression', async ({
+    env,
+    page,
+    loginPage,
+    welcomePage,
+    signInStub,
+    logger,
+  }) => {
+    const welcomeUrl = `${env.webBaseUrl}${ROUTES.welcome}`
+
+    /** The stored record verbatim, for a character-for-character comparison. */
+    const storedRecord = async (): Promise<string | null> =>
+      page.evaluate((key: string) => window.sessionStorage.getItem(key), SESSION_STORAGE_KEY)
+
+    /** Every reading also re-asserts the heading and the absence of the other. */
+    const readAndAssert = async (state: string): Promise<string | null> => {
+      await expect(page, `${state}: the landing screen is on show`).toHaveURL(welcomeUrl)
+      await expect(welcomePage.standardHeading, `${state}: the heading`).toHaveText(
+        LANDING_COPY.standardHeading,
+      )
+      await expect(welcomePage.adminHeading, `${state}: no administrator heading`).toHaveCount(0)
+      return storedRecord()
+    }
+
+    // The history is built before signing in so Back and Forward have somewhere
+    // to go that is still inside the application: sign-in replaces its own
+    // entry rather than pushing one, so a single entry would send Back out of
+    // the client altogether.
+    await openPath(page, ROUTES.root)
+    await expect(loginPage.heading).toBeVisible()
+    await navigateInApp(page, ROUTES.login)
+
+    // Step 1.
+    await signInStub.succeed({ role: 'user' })
+    await signIn(loginPage, {
+      identifier: env.accounts.other.email,
+      password: env.accounts.other.password,
+    })
+    const afterSignIn = await readAndAssert('after signing in')
+    expect(
+      (await readStoredSession(page, SESSION_STORAGE_KEY))?.role,
+      'the platform issued the ordinary role',
+    ).toBe('user')
+
+    // Step 2: a full reload.
+    await hardReload(page)
+    const afterReload = await readAndAssert('after reloading')
+
+    // Step 3: back, then forward. The root entry resolves to the landing
+    // screen now that the session is live, so both ends stay in the app.
+    await goBack(page)
+    await expect(page).toHaveURL(welcomeUrl)
+    await expect(welcomePage.standardHeading).toHaveText(LANDING_COPY.standardHeading)
+    await goForward(page)
+    const afterHistory = await readAndAssert('after navigating back and forward')
+
+    // Step 4: the root address.
+    await openPath(page, ROUTES.root)
+    const afterRoot = await readAndAssert('after opening the root address')
+
+    // Step 5: all four readings, character for character.
+    const readings = [afterSignIn, afterReload, afterHistory, afterRoot]
+    logger.info('stored session readings', { distinct: new Set(readings).size })
+    expect(afterSignIn, 'a session must have been stored to compare').not.toBeNull()
+    for (const [index, reading] of readings.entries()) {
+      expect(reading, `reading ${index + 1} must match the record written at sign-in`).toBe(
+        afterSignIn,
+      )
+    }
+    await expect(
+      welcomePage.adminHeading,
+      'the administrator heading was never rendered',
+    ).toHaveCount(0)
   })
 })

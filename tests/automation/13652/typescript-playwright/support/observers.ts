@@ -5,14 +5,26 @@
  * and every uncaught page error.
  *
  * Telemetry needs a word of explanation. `src/platform/telemetry.ts` holds a
- * module-level sink that starts as `null`, and `emit` returns early while no
- * sink is installed - so with the client in its shipped configuration there is
- * nothing for a browser test to observe. Rather than let the analytics rows
- * (TC-096, TC-097) pass vacuously against an empty array, this installs a
- * collector on `window` before any application script runs and records
- * whatever the application chooses to hand it. The specs pair that runtime
- * capture with a static assertion over the telemetry module's own payload
- * shapes, and REVIEW.md records the limitation.
+ * module-level sink that starts as `null`, `emit` returns early while that is
+ * so, and nothing in the shipped application ever calls `setTelemetrySink` -
+ * `src/main.tsx` mounts the shell and installs no sink. So with the client in
+ * its shipped configuration there is nothing at all for a browser test to
+ * observe, and the analytics rows (TC-096, TC-097, TC-116, TC-118) would pass
+ * vacuously against an empty array.
+ *
+ * Rather than accept that, the collector does two things before any
+ * application script runs:
+ *
+ *   1. It publishes a store on `window` under `TELEMETRY_GLOBAL`.
+ *   2. It intercepts the telemetry module as the dev server serves it and
+ *      appends a few lines that call the module's own `setTelemetrySink` with
+ *      a function forwarding each event into that store.
+ *
+ * Step 2 is a test-only patch of the module text, not a change to the product,
+ * and it is deliberately observable: `bridged()` reports whether the patch
+ * actually landed, so a run against a bundle the pattern does not match fails
+ * loudly instead of reporting "no events, all clear". REVIEW.md carries the
+ * product gap - no sink ships - as an open finding.
  */
 import type { ConsoleMessage, Page } from '@playwright/test'
 
@@ -59,42 +71,153 @@ export function recordConsole(page: Page): ConsoleRecorder {
 /** The global the collector publishes into. Kept namespaced to this suite. */
 export const TELEMETRY_GLOBAL = '__pacco13652Telemetry__'
 
+/** The module whose sink the bridge installs, as the dev server addresses it. */
+export const TELEMETRY_MODULE_PATTERN = /\/src\/platform\/telemetry\.ts(?:\?.*)?$/
+
+/**
+ * Events emitted from a React mount effect.
+ *
+ * `src/main.tsx` mounts the tree inside `<StrictMode>`, and React 19 in
+ * development deliberately invokes every mount effect twice to surface effects
+ * that are not idempotent. That is correct product behaviour under the dev
+ * server, but it means a view event arrives twice where the CSV counts one.
+ *
+ * Only *consecutive, byte-identical* occurrences of these four names are
+ * collapsed, and only these four:
+ *
+ *   🚫 `login.duplicate_suppressed` is NOT here. Four identical consecutive
+ *      events are exactly what TC-116 asserts, and collapsing them would
+ *      delete the assertion.
+ *   🚫 `landing.logout` is NOT here. It is emitted from a click handler, so a
+ *      repeat is a real repeat.
+ */
+export const MOUNT_REPLAY_EVENTS: readonly string[] = [
+  'login.viewed',
+  'landing.viewed',
+  'landing.blocked_unauthenticated',
+  'landing.session_expired',
+]
+
 export interface TelemetryEvent {
   readonly name: string
   readonly payload: Record<string, unknown>
 }
 
 export interface TelemetryRecorder {
+  /** Events with StrictMode mount replays collapsed. */
   events(): Promise<readonly TelemetryEvent[]>
+  /** Every event exactly as the application emitted it. */
+  rawEvents(): Promise<readonly TelemetryEvent[]>
   named(name: string): Promise<readonly TelemetryEvent[]>
   /** Every key any recorded payload carried, for the allow-list check. */
   payloadKeys(): Promise<readonly string[]>
-  /** Serialised events, for substring sweeps. */
+  /** Serialised events, for substring sweeps. Uses the raw list. */
   text(): Promise<string>
+  /**
+   * Whether the sink bridge reached the application's telemetry module.
+   * False means the module was served in a shape the patch did not match, and
+   * an empty event list proves nothing.
+   */
+  bridged(): Promise<boolean>
   clear(): Promise<void>
 }
 
 /**
+ * Collapses consecutive byte-identical mount-effect replays.
+ *
+ * Exported so the behaviour is unit-visible and so a spec can state plainly
+ * which list it is asserting against.
+ */
+export function collapseMountReplays(
+  events: readonly TelemetryEvent[],
+  replayable: readonly string[] = MOUNT_REPLAY_EVENTS,
+): readonly TelemetryEvent[] {
+  const kept: TelemetryEvent[] = []
+  for (const event of events) {
+    const previous = kept[kept.length - 1]
+    const isReplay =
+      previous !== undefined &&
+      replayable.includes(event.name) &&
+      previous.name === event.name &&
+      JSON.stringify(previous.payload) === JSON.stringify(event.payload)
+    if (!isReplay) {
+      kept.push(event)
+    }
+  }
+  return kept
+}
+
+/**
+ * The lines appended to the telemetry module.
+ *
+ * They run in the module's own scope, so `setTelemetrySink` is the module's
+ * real binding rather than a re-import, and the sink is installed before any
+ * component can emit. The event is split into its `name` and the rest of its
+ * fields so the store's shape matches what the CSV calls "the event and its
+ * payload".
+ */
+function bridgeSource(globalName: string): string {
+  return `
+;(function () {
+  try {
+    var collector = window[${JSON.stringify(globalName)}]
+    if (!collector) {
+      return
+    }
+    setTelemetrySink(function (event) {
+      var payload = {}
+      for (var key in event) {
+        if (key !== 'name' && Object.prototype.hasOwnProperty.call(event, key)) {
+          payload[key] = event[key]
+        }
+      }
+      collector.sink(event.name, payload)
+    })
+    collector.markBridged()
+  } catch (error) {
+    // A failing test bridge must not break the application under test; the
+    // spec detects it through bridged() instead.
+  }
+})()
+`
+}
+
+/**
  * Installs the collector. Must be called before the first navigation so the
- * init script lands ahead of application code.
+ * init script and the module route both land ahead of application code.
  */
 export async function installTelemetryCollector(page: Page): Promise<TelemetryRecorder> {
   await page.addInitScript((globalName: string) => {
     const store: Array<{ name: string; payload: Record<string, unknown> }> = []
+    const state = { bridged: false }
     const sink = (name: string, payload: Record<string, unknown> = {}): void => {
       store.push({ name, payload })
     }
     Object.defineProperty(window, globalName, {
-      value: { events: store, sink },
+      value: {
+        events: store,
+        state,
+        sink,
+        markBridged: (): void => {
+          state.bridged = true
+        },
+      },
       writable: false,
       configurable: false,
     })
-    // The application installs a sink through this hook if it has one.
+    // Kept for a build that chooses to publish a hook of its own.
     const hook = (window as unknown as Record<string, unknown>).__paccoInstallTelemetrySink__
     if (typeof hook === 'function') {
       ;(hook as (s: typeof sink) => void)(sink)
+      state.bridged = true
     }
   }, TELEMETRY_GLOBAL)
+
+  await page.route(TELEMETRY_MODULE_PATTERN, async (route) => {
+    const response = await route.fetch()
+    const original = await response.text()
+    await route.fulfill({ response, body: `${original}${bridgeSource(TELEMETRY_GLOBAL)}` })
+  })
 
   const read = async (): Promise<TelemetryEvent[]> =>
     page.evaluate((globalName: string) => {
@@ -104,14 +227,25 @@ export async function installTelemetryCollector(page: Page): Promise<TelemetryRe
       return collector === undefined ? [] : collector.events.map((entry) => ({ ...entry }))
     }, TELEMETRY_GLOBAL)
 
+  const collapsed = async (): Promise<readonly TelemetryEvent[]> =>
+    collapseMountReplays(await read())
+
   return {
-    events: read,
-    named: async (name) => (await read()).filter((event) => event.name === name),
+    events: collapsed,
+    rawEvents: read,
+    named: async (name) => (await collapsed()).filter((event) => event.name === name),
     payloadKeys: async () => {
       const events = await read()
       return [...new Set(events.flatMap((event) => Object.keys(event.payload)))].sort()
     },
     text: async () => JSON.stringify(await read()),
+    bridged: async () =>
+      page.evaluate((globalName: string) => {
+        const collector = (window as unknown as Record<string, unknown>)[globalName] as
+          | { state: { bridged: boolean } }
+          | undefined
+        return collector !== undefined && collector.state.bridged
+      }, TELEMETRY_GLOBAL),
     clear: async () => {
       await page.evaluate((globalName: string) => {
         const collector = (window as unknown as Record<string, unknown>)[globalName] as

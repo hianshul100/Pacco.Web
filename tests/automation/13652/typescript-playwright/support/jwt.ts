@@ -81,7 +81,10 @@ export function readAccessTokenExpiry(accessToken: string): number | null {
  * must produce the generic message and no session, and must never make the
  * client fall back to the response body's `expires` field.
  */
-export function unusableTokens(): ReadonlyArray<{ readonly label: string; readonly token: string }> {
+export function unusableTokens(): ReadonlyArray<{
+  readonly label: string
+  readonly token: string
+}> {
   return [
     { label: 'a single segment', token: mintAccessToken({ segments: 1 }) },
     {

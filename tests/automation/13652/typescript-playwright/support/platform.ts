@@ -33,15 +33,25 @@ export function composeFileArgs(): readonly string[] {
 
 async function compose(args: readonly string[]): Promise<CommandResult> {
   const env = readEnvConfig()
+  // The compose checkout is optional: only the `@live` rows need it, and the
+  // four offline projects must load this module without one. Fail here, naming
+  // the variable to set, rather than shelling out against the suite directory.
+  if (env.composeDir === null) {
+    throw new Error(
+      'The Pacco compose checkout was not found. Set PACCO_COMPOSE_DIR to the directory holding ' +
+        `infrastructure.yml and services.yml before running the live-platform project (docker compose ${args.join(' ')}).`,
+    )
+  }
+  const composeDir = env.composeDir
   try {
     const { stdout, stderr } = await run('docker', ['compose', ...composeFileArgs(), ...args], {
-      cwd: env.composeDir,
+      cwd: composeDir,
       maxBuffer: 16 * 1024 * 1024,
     })
     return { stdout, stderr }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`docker compose ${args.join(' ')} failed in ${env.composeDir}: ${detail}`)
+    throw new Error(`docker compose ${args.join(' ')} failed in ${composeDir}: ${detail}`)
   }
 }
 

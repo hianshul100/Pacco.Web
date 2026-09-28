@@ -24,6 +24,10 @@
     "a11y:scan": "ts-node --project tsconfig.json scripts/scan-and-report.ts",
     "report": "playwright show-report reports/html"
   },
+  "//overrides": "@axe-core/playwright declares a floating playwright-core range. Without this pin npm installs a second, newer copy and its `Page` type stops being assignable to @playwright/test's - the suite then fails to typecheck for a reason that has nothing to do with the tests.",
+  "overrides": {
+    "playwright-core": "1.49.1"
+  },
   "devDependencies": {
     "@axe-core/playwright": "4.10.1",
     "@eslint/js": "9.17.0",
@@ -35,6 +39,6 @@
     "prettier": "3.6.2",
     "ts-node": "10.9.2",
     "typescript": "5.8.3",
-    "typescript-eslint": "8.19.0"
+    "typescript-eslint": "8.32.1"
   }
 }

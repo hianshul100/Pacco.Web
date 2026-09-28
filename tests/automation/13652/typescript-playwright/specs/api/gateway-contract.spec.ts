@@ -78,10 +78,10 @@ test.describe('Gateway contract @story:13652 @component:pacco-web-login', () => 
     const parsed = JSON.parse(body) as Record<string, unknown>
 
     // Exactly two fields, named exactly as the platform expects.
-    expect(Object.keys(parsed).sort(), `unexpected request body: ${Object.keys(parsed).join(', ')}`).toEqual([
-      'email',
-      'password',
-    ])
+    expect(
+      Object.keys(parsed).sort(),
+      `unexpected request body: ${Object.keys(parsed).join(', ')}`,
+    ).toEqual(['email', 'password'])
     expect(parsed['email'], 'the identifier is sent verbatim, untrimmed and unaltered').toBe(
       identifier,
     )

@@ -31,7 +31,12 @@ const NO_FIXED_DELAY = [
       'Fixed delays are banned. Wait on a web-first assertion, a response, or a navigation event instead.',
   },
   {
-    selector: "NewExpression[callee.name='Promise'] > ArrowFunctionExpression",
+    // Narrowed to promises that actually sleep. `new Promise` around an
+    // event-based browser API (IndexedDB's request callbacks in support/sweep.ts,
+    // for instance) settles on the event, which is precisely what this rule
+    // wants people to do - banning the shape outright would ban the cure.
+    selector:
+      "NewExpression[callee.name='Promise'] > ArrowFunctionExpression:has(CallExpression[callee.name='setTimeout'])",
     message:
       'Hand-rolled sleep promises are banned. Wait on a web-first assertion, a response, or a navigation event instead.',
   },
@@ -89,7 +94,10 @@ module.exports = tseslint.config(
     rules: {
       eqeqeq: ['error', 'always'],
       'no-restricted-syntax': ['error', ...NO_FIXED_DELAY],
-      'no-console': ['error', { allow: [] }],
+      // No `allow` list: the rule's schema rejects an empty one, and every
+      // console method is banned here anyway. Output goes through
+      // support/logger.ts so it is redacted and carries a correlation id.
+      'no-console': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/explicit-function-return-type': [
@@ -116,6 +124,11 @@ module.exports = tseslint.config(
     files: ['specs/**/*.ts', 'pages/**/*.ts'],
     rules: {
       'no-restricted-syntax': ['error', ...NO_FIXED_DELAY, ...NO_ENVIRONMENT_LITERALS],
+      // Every test body is declared `async` so the signature is uniform and a
+      // later `await` can be added without touching the declaration. The
+      // static-analysis rows read the checkout synchronously and legitimately
+      // await nothing.
+      '@typescript-eslint/require-await': 'off',
     },
   },
   {
@@ -127,6 +140,26 @@ module.exports = tseslint.config(
         ...NO_ENVIRONMENT_LITERALS,
         ...PAGE_OBJECT_PURITY,
       ],
+    },
+  },
+  {
+    // Playwright's own fixture signature is `async ({}, use) => {}` for a
+    // fixture that depends on nothing. There is no other way to write it.
+    files: ['support/fixtures.ts'],
+    rules: { 'no-empty-pattern': 'off' },
+  },
+  {
+    // This file is not part of the TypeScript program, so the type-aware rules
+    // have nothing to work with. Lint it with the syntactic rules only.
+    files: ['eslint.config.js'],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      ...tseslint.configs.disableTypeChecked.languageOptions,
+      sourceType: 'commonjs',
+      // The project service is switched off for this file, so its CommonJS
+      // globals have to be declared by hand.
+      globals: { require: 'readonly', module: 'writable', __dirname: 'readonly' },
+      parserOptions: { projectService: false, project: false, program: null },
     },
   },
   {

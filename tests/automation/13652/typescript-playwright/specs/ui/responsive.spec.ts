@@ -175,9 +175,10 @@ test.describe('Responsive layout @story:13652 @component:pacco-web-login', () =>
 
     // The card stays a card: centred, bounded, not edge to edge.
     const formBox = await loginPage.form.boundingBox()
-    expect(formBox?.width ?? viewport.width, 'the form must stay bounded on a wide screen').toBeLessThan(
-      viewport.width,
-    )
+    expect(
+      formBox?.width ?? viewport.width,
+      'the form must stay bounded on a wide screen',
+    ).toBeLessThan(viewport.width)
     const leftGap = formBox?.x ?? 0
     const rightGap = viewport.width - ((formBox?.x ?? 0) + (formBox?.width ?? 0))
     expect(

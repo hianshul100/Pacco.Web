@@ -95,13 +95,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            echo "::warning::No package-lock.json committed yet; falling back to npm install."
-            npm install
-          fi
+        # `npm ci` only: package-lock.json is committed, so a resolution that
+        # drifts from it must fail the build rather than be silently repaired.
+        run: npm ci
 
       - name: Lint
         run: npm run lint
@@ -129,8 +125,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+        run: npm ci
 
       - name: Install Chromium
         run: npm run install:browsers
@@ -164,6 +159,8 @@ jobs:
           PACCO_UNKNOWN_EMAIL_STUBBED: ${{ vars.PACCO_UNKNOWN_EMAIL_STUBBED }}
           PACCO_WRONG_PASSWORD: ${{ secrets.PACCO_WRONG_PASSWORD }}
           PACCO_WRONG_PASSWORD_LIVE: ${{ secrets.PACCO_WRONG_PASSWORD_LIVE }}
+          # A distinct wrong passphrase per attempt for TC-119.
+          PACCO_WRONG_PASSWORD_SEQUENCE: ${{ secrets.PACCO_WRONG_PASSWORD_SEQUENCE }}
           PACCO_ADMIN_SHAPED_EMAIL: ${{ vars.PACCO_ADMIN_SHAPED_EMAIL }}
           PACCO_PASSWORD_CANARY: ${{ vars.PACCO_PASSWORD_CANARY }}
           PACCO_REFRESH_TOKEN_CANARY: ${{ vars.PACCO_REFRESH_TOKEN_CANARY }}
@@ -237,7 +234,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm ci
           npm run install:browsers
 
       - name: Start the standalone client
@@ -264,6 +261,8 @@ jobs:
           PACCO_UNKNOWN_EMAIL_STUBBED: ${{ vars.PACCO_UNKNOWN_EMAIL_STUBBED }}
           PACCO_WRONG_PASSWORD: ${{ secrets.PACCO_WRONG_PASSWORD }}
           PACCO_WRONG_PASSWORD_LIVE: ${{ secrets.PACCO_WRONG_PASSWORD_LIVE }}
+          # A distinct wrong passphrase per attempt for TC-119.
+          PACCO_WRONG_PASSWORD_SEQUENCE: ${{ secrets.PACCO_WRONG_PASSWORD_SEQUENCE }}
           PACCO_ADMIN_SHAPED_EMAIL: ${{ vars.PACCO_ADMIN_SHAPED_EMAIL }}
           PACCO_PASSWORD_CANARY: ${{ vars.PACCO_PASSWORD_CANARY }}
           PACCO_REFRESH_TOKEN_CANARY: ${{ vars.PACCO_REFRESH_TOKEN_CANARY }}

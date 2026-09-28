@@ -18,7 +18,12 @@ import { newCorrelationId, testCaseIdFrom } from './correlation'
 import type { EnvConfig } from './env'
 import { readEnvConfig } from './env'
 import { createLogger, redact, type Logger } from './logger'
-import { recordNavigation, recordTraffic, type NavigationRecorder, type TrafficRecorder } from './network'
+import {
+  recordNavigation,
+  recordTraffic,
+  type NavigationRecorder,
+  type TrafficRecorder,
+} from './network'
 import {
   installTelemetryCollector,
   recordConsole,

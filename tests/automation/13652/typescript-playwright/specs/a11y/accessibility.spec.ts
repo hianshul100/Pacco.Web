@@ -1,7 +1,7 @@
 /**
  * Automated accessibility.
  *
- * Source rows: TC-13652-085, 086, 087, 088, 089, 090, 095.
+ * Source rows: TC-13652-085, 086, 087, 088, 089, 090, 095, 128.
  *
  * The scan configuration - WCAG level, tag list, failure policy, the pages to
  * visit - lives in `config/a11y.config.ts` and is driven by environment
@@ -12,10 +12,16 @@
  * An automated scan is not a substitute for a manual pass; TC-111 and TC-112
  * carry that, and they are recorded in `specs/manual/manual-review.spec.ts`.
  */
-import type { TestInfo } from '@playwright/test'
+import type { Locator, TestInfo } from '@playwright/test'
 
 import { readA11yConfig } from '../../config/a11y.config'
-import { fillCredentials, openPath, submitSignIn, tabThrough } from '../../support/actions'
+import {
+  fillCredentials,
+  openPath,
+  submitSignIn,
+  tabThrough,
+  typeCharacter,
+} from '../../support/actions'
 import { LOGIN_COPY, MESSAGES, ROUTES } from '../../support/expectedCopy'
 import { expect, test } from '../../support/fixtures'
 import { seedSession } from '../../support/sessionSeed'
@@ -28,11 +34,32 @@ async function attachScan(testInfo: TestInfo, name: string, results: unknown): P
   })
 }
 
+/**
+ * Resolves `aria-describedby` the way assistive technology does: every
+ * referenced element's text, in the order the attribute lists them.
+ *
+ * TC-128 is about what a field *announces*, so reading the attribute alone
+ * would not be enough - a reference to a missing id announces nothing.
+ */
+async function announcedDescription(field: Locator): Promise<readonly string[]> {
+  return field.evaluate<string[]>((element) => {
+    const ids = (element.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/)
+      .filter((id) => id !== '')
+    return ids.map((id) =>
+      (document.getElementById(id)?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    )
+  })
+}
+
 function describeViolations(
   violations: ReadonlyArray<{ id: string; impact?: string | null; help: string; nodes: unknown[] }>,
 ): string {
   return violations
-    .map((violation) => `${violation.id} (${violation.impact ?? 'unknown'}): ${violation.help} × ${violation.nodes.length}`)
+    .map(
+      (violation) =>
+        `${violation.id} (${violation.impact ?? 'unknown'}): ${violation.help} × ${violation.nodes.length}`,
+    )
     .join('\n')
 }
 
@@ -155,10 +182,9 @@ test.describe('Accessibility @story:13652 @component:pacco-web-login', () => {
     // user is told where they have landed rather than left at the document top.
     const focusedText = await page.evaluate(() => document.activeElement?.textContent ?? '')
     const headingText = (await welcomePage.heading.textContent()) ?? ''
-    expect(
-      focusedText.trim(),
-      'focus must move to the landing heading on entry',
-    ).toBe(headingText.trim())
+    expect(focusedText.trim(), 'focus must move to the landing heading on entry').toBe(
+      headingText.trim(),
+    )
 
     // The heading is programmatically focusable but not a tab stop of its own.
     await expect(welcomePage.heading).toHaveAttribute('tabindex', '-1')
@@ -286,7 +312,8 @@ test.describe('Accessibility @story:13652 @component:pacco-web-login', () => {
       )
 
       // Nothing is clipped away: every control is still on screen and usable.
-      const controls = target.id === 'login' ? loginPage.interactiveElements : welcomePage.interactiveElements
+      const controls =
+        target.id === 'login' ? loginPage.interactiveElements : welcomePage.interactiveElements
       const count = await controls.count()
       expect(count, `${target.id} lost its controls at double magnification`).toBeGreaterThan(0)
       for (let index = 0; index < count; index += 1) {
@@ -302,5 +329,73 @@ test.describe('Accessibility @story:13652 @component:pacco-web-login', () => {
         ).toEqual([])
       }
     }
+  })
+
+  test('TC-13652-128 Verify that only the field that failed validation is marked invalid to assistive technology @layer:a11y @ac:AC-3 @intent:regression', async ({
+    env,
+    page,
+    loginPage,
+    traffic,
+  }) => {
+    await openPath(page, ROUTES.login)
+    const address = env.accounts.other.email
+
+    // --- Step 1: submit with the password empty ---------------------------
+    await loginPage.identifier.fill(address)
+    await expect(loginPage.password).toHaveValue('')
+    traffic.clear()
+    await submitSignIn(loginPage)
+
+    await expect(loginPage.password).toBeFocused()
+    expect(traffic.signIn(), 'a blocked submission must not reach the edge at all').toEqual([])
+
+    // --- Step 2: the offending field --------------------------------------
+    await expect(loginPage.password).toHaveAttribute('aria-invalid', 'true')
+    await expect(loginPage.passwordMessage).toBeVisible()
+    // Its own message first, then the helper text it always carried: the error
+    // is added to the description, not substituted for the guidance.
+    expect(
+      await announcedDescription(loginPage.password),
+      'the password field must announce its own error alongside its helper text',
+    ).toEqual([LOGIN_COPY.passwordRequired, LOGIN_COPY.passwordHelp])
+
+    // --- Step 3: the field that was filled in correctly -------------------
+    await expect(loginPage.identifier).toHaveAttribute('aria-invalid', 'false')
+    await expect(loginPage.identifierMessage).toHaveCount(0)
+    expect(
+      await announcedDescription(loginPage.identifier),
+      'a correct entry must carry no error description',
+    ).toEqual([LOGIN_COPY.identifierHelp])
+
+    // Exactly one field-level message is rendered, not one per field.
+    await expect(loginPage.fieldMessages).toHaveCount(1)
+
+    // --- Step 4: filling the offending field clears its marking -----------
+    await typeCharacter(loginPage.password, 'a')
+
+    await expect(loginPage.password).toHaveAttribute('aria-invalid', 'false')
+    await expect(loginPage.passwordMessage).toHaveCount(0)
+    expect(await announcedDescription(loginPage.password)).toEqual([LOGIN_COPY.passwordHelp])
+    await expect(loginPage.identifier).toHaveAttribute('aria-invalid', 'false')
+
+    // --- Step 5: the marking swaps to the other field ---------------------
+    await loginPage.identifier.fill('')
+    traffic.clear()
+    await submitSignIn(loginPage)
+
+    await expect(loginPage.identifier).toBeFocused()
+    expect(traffic.signIn(), 'the second blocked submission must not be sent either').toEqual([])
+
+    await expect(loginPage.identifier).toHaveAttribute('aria-invalid', 'true')
+    await expect(loginPage.identifierMessage).toBeVisible()
+    expect(await announcedDescription(loginPage.identifier)).toEqual([
+      LOGIN_COPY.identifierRequired,
+      LOGIN_COPY.identifierHelp,
+    ])
+
+    await expect(loginPage.password).toHaveAttribute('aria-invalid', 'false')
+    await expect(loginPage.passwordMessage).toHaveCount(0)
+    expect(await announcedDescription(loginPage.password)).toEqual([LOGIN_COPY.passwordHelp])
+    await expect(loginPage.fieldMessages).toHaveCount(1)
   })
 })

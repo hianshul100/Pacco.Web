@@ -27,6 +27,7 @@ const REQUIRED_CREDENTIAL_VARS = [
   'PACCO_UNKNOWN_EMAIL_STUBBED',
   'PACCO_WRONG_PASSWORD',
   'PACCO_WRONG_PASSWORD_LIVE',
+  'PACCO_WRONG_PASSWORD_SEQUENCE',
   'PACCO_ADMIN_SHAPED_EMAIL',
   'PACCO_PASSWORD_CANARY',
   'PACCO_REFRESH_TOKEN_CANARY',
@@ -52,6 +53,24 @@ function required(name: string): string {
     )
   }
   return value
+}
+
+/**
+ * Reads a required variable holding a comma-separated list.
+ *
+ * Used for fixture sets whose *size* the CSV fixes - six wrong passwords, not
+ * "some" - so a short list is caught at configuration time rather than turning
+ * into a quietly shorter loop.
+ */
+function csv(name: string): readonly string[] {
+  const values = required(name)
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+  if (values.length === 0) {
+    throw new Error(`${name} must list at least one value, separated by commas.`)
+  }
+  return values
 }
 
 function int(name: string, fallback: number): number {
@@ -110,7 +129,8 @@ function resolveSibling(
   subPath: string,
   markerFiles: readonly string[],
 ): string | null {
-  const holdsMarkers = (dir: string) => markerFiles.every((file) => existsSync(join(dir, file)))
+  const holdsMarkers = (dir: string): boolean =>
+    markerFiles.every((file) => existsSync(join(dir, file)))
 
   const override = raw(overrideVar)
   if (override !== undefined) {
@@ -167,6 +187,12 @@ export interface EnvConfig {
     readonly unknownEmailStubbed: string
     readonly wrongPassword: string
     readonly wrongPasswordLive: string
+    /**
+     * The distinct wrong passwords TC-119 submits back to back, in order.
+     * Distinct values so a platform that deduplicated identical attempts could
+     * not make the row pass by accident.
+     */
+    readonly wrongPasswordSequence: readonly string[]
     readonly adminShapedEmail: string
   }
 
@@ -185,6 +211,27 @@ export interface EnvConfig {
     readonly slowResponseMs: number
     readonly abortDelayMs: number
     readonly idleObservationMs: number
+    /** How long TC-116 holds the sign-in response open while it double-clicks. */
+    readonly telemetryHoldMs: number
+    /** How long TC-127 holds a response open to observe the in-flight state. */
+    readonly inFlightHoldMs: number
+    /** The lifetime TC-113 seeds, in seconds, so the session expires mid-test. */
+    readonly shortSessionSeconds: number
+    /** How far TC-113 advances the page clock past that lifetime. */
+    readonly clockAdvanceMs: number
+  }
+
+  /**
+   * Repetition counts the CSV fixes. Externalised so a row's "six attempts"
+   * is a configured fact rather than a number buried in a loop.
+   */
+  readonly repetitions: {
+    /** TC-117: timed sign-in round trips. */
+    readonly latencySamples: number
+    /** TC-119: consecutive wrong-password attempts before the correct one. */
+    readonly failedAttempts: number
+    /** TC-116: extra submit clicks issued while the first request is open. */
+    readonly duplicateClicks: number
   }
 
   readonly a11y: {
@@ -280,6 +327,7 @@ export function readEnvConfig(): EnvConfig {
       unknownEmailStubbed: required('PACCO_UNKNOWN_EMAIL_STUBBED'),
       wrongPassword: required('PACCO_WRONG_PASSWORD'),
       wrongPasswordLive: required('PACCO_WRONG_PASSWORD_LIVE'),
+      wrongPasswordSequence: csv('PACCO_WRONG_PASSWORD_SEQUENCE'),
       adminShapedEmail: required('PACCO_ADMIN_SHAPED_EMAIL'),
     },
 
@@ -298,6 +346,16 @@ export function readEnvConfig(): EnvConfig {
       slowResponseMs: int('PACCO_SLOW_RESPONSE_DELAY_MS', 2_000),
       abortDelayMs: int('PACCO_ABORT_DELAY_MS', 300),
       idleObservationMs: int('PACCO_IDLE_OBSERVATION_MS', 3_000),
+      telemetryHoldMs: int('PACCO_TELEMETRY_HOLD_MS', 1_500),
+      inFlightHoldMs: int('PACCO_IN_FLIGHT_HOLD_MS', 5_000),
+      shortSessionSeconds: int('PACCO_SHORT_SESSION_SECONDS', 2),
+      clockAdvanceMs: int('PACCO_CLOCK_ADVANCE_MS', 5_000),
+    },
+
+    repetitions: {
+      latencySamples: int('PACCO_LATENCY_SAMPLES', 5),
+      failedAttempts: int('PACCO_FAILED_ATTEMPTS', 6),
+      duplicateClicks: int('PACCO_DUPLICATE_CLICKS', 4),
     },
 
     a11y: {

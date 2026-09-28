@@ -1,7 +1,7 @@
 /**
  * What is written in the repository.
  *
- * Source rows: TC-13652-020, 021, 022, 043, 059, 072.
+ * Source rows: TC-13652-020, 021, 022, 043, 059, 072, 115.
  *
  * None of these rows can be answered by driving a browser: they ask whether a
  * second backend address is hard-coded somewhere, whether a credential was
@@ -43,7 +43,10 @@ test.describe('Static source scans @story:13652 @component:pacco-web-login', () 
     logger,
   }) => {
     const files = clientSourceFiles(env.clientRepoDir)
-    expect(files.length, `no client sources were found under ${env.clientRepoDir}/src`).toBeGreaterThan(0)
+    expect(
+      files.length,
+      `no client sources were found under ${env.clientRepoDir}/src`,
+    ).toBeGreaterThan(0)
 
     const hits = findInSources(files, ABSOLUTE_ADDRESS_PATTERN)
     logger.info('absolute address literals found', { count: hits.length })
@@ -188,13 +191,8 @@ test.describe('Static source scans @story:13652 @component:pacco-web-login', () 
     expect(files.length).toBeGreaterThan(0)
 
     // The landing decision is made on the session role and nothing else.
-    const presentation = files.filter((file) =>
-      /(?:welcome|landing|role)/i.test(file.relativePath),
-    )
-    expect(
-      presentation.length,
-      'no presentation module was found to inspect',
-    ).toBeGreaterThan(0)
+    const presentation = files.filter((file) => /(?:welcome|landing|role)/i.test(file.relativePath))
+    expect(presentation.length, 'no presentation module was found to inspect').toBeGreaterThan(0)
 
     const identifierDrivenDecision =
       /if\s*\([^)]*\b(email|identifier|username|userName|login)\b[^)]*\)|\b(email|identifier|username)\b[^\n]*\?\s/
@@ -228,17 +226,23 @@ test.describe('Static source scans @story:13652 @component:pacco-web-login', () 
 
     const renewalPatterns: ReadonlyArray<{ readonly name: string; readonly pattern: RegExp }> = [
       { name: 'a refresh route', pattern: /['"`][^'"`]*refresh[-_]?tokens?[^'"`]*['"`]/i },
-      { name: 'a renewal call', pattern: /\b(renewSession|refreshSession|silentRefresh|reAuthenticate|renewToken)\b/ },
-      { name: 'a scheduled renewal', pattern: /\bset(?:Interval|Timeout)\s*\([^)]*\b(refresh|renew)\b/i },
-      { name: 'a revocation route', pattern: /['"`][^'"`]*\/(?:logout|revoke|sign-out)[^'"`]*['"`]/i },
+      {
+        name: 'a renewal call',
+        pattern: /\b(renewSession|refreshSession|silentRefresh|reAuthenticate|renewToken)\b/,
+      },
+      {
+        name: 'a scheduled renewal',
+        pattern: /\bset(?:Interval|Timeout)\s*\([^)]*\b(refresh|renew)\b/i,
+      },
+      {
+        name: 'a revocation route',
+        pattern: /['"`][^'"`]*\/(?:logout|revoke|sign-out)[^'"`]*['"`]/i,
+      },
     ]
 
     for (const rule of renewalPatterns) {
       const hits = findInSources(files, rule.pattern)
-      expect(
-        hits,
-        `the client references ${rule.name}:\n${describeScanHits(hits)}`,
-      ).toEqual([])
+      expect(hits, `the client references ${rule.name}:\n${describeScanHits(hits)}`).toEqual([])
     }
 
     // The refresh token may be named where the response shape is described -
@@ -251,5 +255,100 @@ test.describe('Static source scans @story:13652 @component:pacco-web-login', () 
       persisted,
       `the refresh token is written to storage:\n${describeScanHits(persisted)}`,
     ).toEqual([])
+  })
+
+  test('TC-13652-115 Verify that the session is written from exactly one place after a success @layer:static @ac:AC-8 @ac:AC-12 @intent:regression', async ({
+    env,
+  }) => {
+    // Step 1: the checkout is present and readable.
+    const files = clientSourceFiles(env.clientRepoDir)
+    expect(files.length, 'the client source tree must be readable').toBeGreaterThan(0)
+
+    // The module that DECLARES the write is not a caller of it.
+    const declaring = files.filter((file) => /\bfunction\s+write\s*\(/.test(file.text))
+    expect(
+      declaring.map((file) => file.relativePath),
+      'exactly one module may declare the session write',
+    ).toEqual(['session/sessionStore.ts'])
+    const others = files.filter((file) => file.relativePath !== 'session/sessionStore.ts')
+
+    // Step 2: exactly one module uses it.
+    const WRITE_CALL = /\bSessionStore\.write\s*\(/
+    const callers = others.filter((file) => WRITE_CALL.test(file.text))
+    expect(
+      callers.map((file) => file.relativePath),
+      'the session write must have exactly one caller',
+    ).toEqual(['features/login/useSignIn.ts'])
+
+    // ...and nothing smuggles it out under another name.
+    const aliased = findInSources(
+      others,
+      /(?:const|let|var)\s*\{[^}]*\bwrite\b[^}]*\}\s*=\s*SessionStore/,
+    )
+    expect(
+      aliased,
+      `the session write is aliased out of SessionStore:\n${describeScanHits(aliased)}`,
+    ).toEqual([])
+
+    // Step 3: exactly one call site across the whole tree.
+    const callSites = findInSources(others, WRITE_CALL)
+    expect(
+      callSites,
+      `the session write must have exactly one call site:\n${describeScanHits(callSites)}`,
+    ).toHaveLength(1)
+
+    // Step 4: the call site sits behind the parsed-success guards.
+    const caller = callers[0]
+    expect(caller, 'the single caller must have been read').toBeDefined()
+    const lines = (caller?.text ?? '').split('\n')
+    const writeLine = lines.findIndex((line) => WRITE_CALL.test(line))
+    expect(writeLine, 'the call site must be locatable by line').toBeGreaterThan(-1)
+
+    // Every one of these has to appear ABOVE the write: a non-200, an
+    // unparseable body and an unreadable token expiry each return before the
+    // write can be reached, so no other state can arrive at it.
+    const requiredGuards: ReadonlyArray<{ readonly label: string; readonly pattern: RegExp }> = [
+      { label: 'the non-200 return', pattern: /response\.status\s*!==\s*200/ },
+      { label: 'the body parse', pattern: /readAuthDto\s*\(/ },
+      { label: 'the unparseable-body return', pattern: /auth\s*===\s*null/ },
+      { label: 'the token expiry read', pattern: /readAccessTokenExpiry\s*\(/ },
+      { label: 'the unreadable-expiry return', pattern: /expiresAt\s*===\s*null/ },
+    ]
+    for (const guard of requiredGuards) {
+      const guardLine = lines.findIndex((line) => guard.pattern.test(line))
+      expect(
+        guardLine,
+        `${guard.label} is missing from ${caller?.relativePath ?? ''}`,
+      ).toBeGreaterThan(-1)
+      expect(
+        guardLine,
+        `${guard.label} must be evaluated before the session is written`,
+      ).toBeLessThan(writeLine)
+    }
+
+    // Step 5: nothing outside that one submission writes a session - neither
+    // through the store nor by reaching past it into storage directly.
+    // `.setItem(` however it is reached - through a named storage, through an
+    // alias, or through a destructured handle.
+    const rawWrites = findInSources(others, /\.setItem\s*\(|\bdocument\.cookie\s*=/)
+    expect(
+      rawWrites,
+      `storage is written outside the session store:\n${describeScanHits(rawWrites)}`,
+    ).toEqual([])
+
+    const forbiddenWriters: ReadonlyArray<{ readonly label: string; readonly pattern: RegExp }> = [
+      { label: 'the landing screen', pattern: /^features\/welcome\/WelcomeRoute\.tsx$/ },
+      { label: 'the route guard', pattern: /^features\/welcome\/RequireSession\.tsx$/ },
+      { label: 'the logout control', pattern: /^features\/welcome\/LogoutAction\.tsx$/ },
+      { label: 'the root-address resolver', pattern: /^Router\.tsx$/ },
+    ]
+    for (const writer of forbiddenWriters) {
+      const matched = files.filter((file) => writer.pattern.test(file.relativePath))
+      // A module that is not there cannot be proven silent, so its absence is
+      // a failure of the scan rather than a pass.
+      expect(matched, `${writer.label} was not found in the checkout`).toHaveLength(1)
+      const hits = findInSources(matched, /\bSessionStore\.write\s*\(|\.setItem\s*\(/)
+      expect(hits, `${writer.label} writes the session:\n${describeScanHits(hits)}`).toEqual([])
+    }
   })
 })

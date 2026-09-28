@@ -11,11 +11,7 @@
  *
  * They talk to the real platform, so they are all tagged `@live`.
  */
-import {
-  probeSignIn,
-  runningServices,
-  serviceLogs,
-} from '../../support/platform'
+import { probeSignIn, runningServices, serviceLogs } from '../../support/platform'
 import { expect, test } from '../../support/fixtures'
 
 test.describe('Platform regression @story:13652 @component:pacco-web-login', () => {
@@ -194,14 +190,15 @@ test.describe('Platform regression @story:13652 @component:pacco-web-login', () 
     logger.info('compose services running', { count: services.length })
 
     // The sign-in service is part of the stack.
-    expect(
-      services,
-      `${env.signInServiceName} is not running in the compose stack`,
-    ).toContain(env.signInServiceName)
+    expect(services, `${env.signInServiceName} is not running in the compose stack`).toContain(
+      env.signInServiceName,
+    )
 
     // The browser client is NOT: it is a separate local process, never a
     // service in the backend stack and never served by the gateway.
-    const clientLike = services.filter((name) => /pacco[-_.]?web|frontend|client[-_]?ui/i.test(name))
+    const clientLike = services.filter((name) =>
+      /pacco[-_.]?web|frontend|client[-_]?ui/i.test(name),
+    )
     expect(
       clientLike,
       `the browser client must not be a backend service: found ${clientLike.join(', ')}`,

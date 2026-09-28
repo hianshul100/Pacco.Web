@@ -63,6 +63,18 @@ export function successBody(options: SuccessBodyOptions = {}): SignInSuccessBody
   }
 }
 
+/** The `{ code, reason }` body shape, with absent fields genuinely absent. */
+function rejectionPayload(code: string | null, reason?: string): Record<string, unknown> {
+  const payload: Record<string, unknown> = {}
+  if (code !== null) {
+    payload['code'] = code
+  }
+  if (reason !== undefined) {
+    payload['reason'] = reason
+  }
+  return payload
+}
+
 export interface SignInStub {
   /** How many times the stub answered. */
   count(): number
@@ -80,6 +92,14 @@ export interface SignInStub {
   succeedWithRawBody(body: string): Promise<void>
   /** 400 carrying `{ code, reason }` the way the platform does. */
   rejectWith(code: string | null, reason?: string): Promise<void>
+  /**
+   * 400 held open for `delayMs` before it is answered.
+   *
+   * TC-127 needs a *settled* outcome that leaves the sign-in screen mounted:
+   * a held success unmounts it on arrival, so the row's last step - "both
+   * fields are editable again" - would have nothing left to observe.
+   */
+  rejectSlowly(delayMs: number, code: string | null, reason?: string): Promise<void>
   /** 400 whose body is exactly `body`. */
   rejectWithRawBody(body: string): Promise<void>
   /** Any status, with an optional body. */
@@ -164,15 +184,15 @@ export async function stubSignIn(page: Page): Promise<SignInStub> {
 
     succeedWithRawBody: async (body) => setHandler(json(200, body)),
 
-    rejectWith: async (code, reason) => {
-      const payload: Record<string, unknown> = {}
-      if (code !== null) {
-        payload['code'] = code
-      }
-      if (reason !== undefined) {
-        payload['reason'] = reason
-      }
-      return setHandler(json(400, JSON.stringify(payload)))
+    rejectWith: async (code, reason) =>
+      setHandler(json(400, JSON.stringify(rejectionPayload(code, reason)))),
+
+    rejectSlowly: async (delayMs, code, reason) => {
+      const body = JSON.stringify(rejectionPayload(code, reason))
+      await setHandler(async (route) => {
+        await holdResponse(delayMs)
+        await json(400, body)(route)
+      })
     },
 
     rejectWithRawBody: async (body) => setHandler(json(400, body)),
@@ -231,7 +251,11 @@ export function malformedSuccessBodies(): ReadonlyArray<{
   return [
     {
       label: 'the token absent',
-      body: JSON.stringify({ refreshToken: complete.refreshToken, role: 'user', expires: complete.expires }),
+      body: JSON.stringify({
+        refreshToken: complete.refreshToken,
+        role: 'user',
+        expires: complete.expires,
+      }),
     },
     { label: 'the token empty', body: JSON.stringify({ ...complete, accessToken: '' }) },
     {
@@ -249,6 +273,18 @@ export function malformedSuccessBodies(): ReadonlyArray<{
 
 /** The unmapped platform codes TC-030 enumerates. */
 export const UNMAPPED_FAILURE_CODES = ['error', 'account_locked', 'some_future_code'] as const
+
+/**
+ * One unrecognised platform code, for the rows that sweep telemetry for "the
+ * platform's error code".
+ *
+ * 🚫 Deliberately NOT `invalid_credentials`. That string is both a code the
+ * platform sends and a bounded classification label the client is *required*
+ * to record (TC-116), so a substring sweep for it cannot tell a leak from
+ * correct behaviour and would fail the wrong way round. A code the client's
+ * mapping does not recognise appears in telemetry only if it leaked.
+ */
+export const UNRECOGNISED_PLATFORM_CODE: string = UNMAPPED_FAILURE_CODES[1]
 
 /** The server-side statuses TC-033 enumerates. */
 export const SERVER_ERROR_STATUSES = [500, 502, 503, 504] as const

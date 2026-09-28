@@ -56,8 +56,19 @@ export class LoginPage extends BasePage {
     })
   }
 
+  /**
+   * The primary action.
+   *
+   * ⚠️ Matched on EITHER name. `LoginCard` renames the control to "Signing in…"
+   * for the duration of a request, so a locator pinned to the idle name would
+   * stop resolving exactly when TC-017 and TC-127 need to read its busy state.
+   * There is only ever one submit control (TC-005), so the alternation cannot
+   * widen the match.
+   */
   get submit(): Locator {
-    return this.page.getByRole('button', { name: LOGIN_COPY.submit, exact: true })
+    return this.page.getByRole('button', {
+      name: new RegExp(`^(?:${LOGIN_COPY.submit}|${LOGIN_COPY.submitProcessing})$`),
+    })
   }
 
   /** Every submit control on the screen. TC-005 requires exactly one. */
@@ -94,9 +105,16 @@ export class LoginPage extends BasePage {
     return this.page.getByText(LOGIN_COPY.passwordRequired, { exact: true })
   }
 
-  /** Every field-level validation message currently rendered. */
+  /**
+   * Every field-level validation message currently rendered.
+   *
+   * Both fields render their error into a paragraph whose id is the input's id
+   * suffixed with `-error`, and render nothing at all when they are valid - so
+   * counting these elements counts the fields currently marked invalid
+   * (TC-128).
+   */
   get fieldMessages(): Locator {
-    return this.page.locator('[data-field-message], [id$="-message"]')
+    return this.page.locator('[id$="-error"]')
   }
 
   /**

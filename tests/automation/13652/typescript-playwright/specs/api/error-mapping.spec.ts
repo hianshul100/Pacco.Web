@@ -75,10 +75,9 @@ test.describe('Failure mapping @story:13652 @component:pacco-web-login', () => {
     await expect(loginPage.formMessage).toHaveText(MESSAGES.credentials)
 
     // Character for character, including markup: nothing enumerates accounts.
-    expect(
-      await loginPage.formMessage.innerHTML(),
-      'both outcomes must render identically',
-    ).toBe(wrongPasswordMarkup)
+    expect(await loginPage.formMessage.innerHTML(), 'both outcomes must render identically').toBe(
+      wrongPasswordMarkup,
+    )
     expect(await readStoredSession(page, SESSION_STORAGE_KEY)).toBeNull()
   })
 
@@ -230,10 +229,9 @@ test.describe('Failure mapping @story:13652 @component:pacco-web-login', () => {
       await loginPage.password.fill(env.accounts.standard.password)
       await submitSignIn(loginPage)
       await expect
-        .poll(
-          () => traffic.signIn().length,
-          { message: `the lock was not released after ${transport.label}` },
-        )
+        .poll(() => traffic.signIn().length, {
+          message: `the lock was not released after ${transport.label}`,
+        })
         .toBe(2)
     }
   })
@@ -342,6 +340,8 @@ test.describe('Failure mapping @story:13652 @component:pacco-web-login', () => {
       await expect(page).toHaveURL(`${env.webBaseUrl}${ROUTES.login}`)
     }
 
-    expect(consoleLog.pageErrors(), 'an unusable token must not raise an uncaught error').toEqual([])
+    expect(consoleLog.pageErrors(), 'an unusable token must not raise an uncaught error').toEqual(
+      [],
+    )
   })
 })

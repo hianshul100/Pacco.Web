@@ -34,7 +34,12 @@ function allowedOrigins(config: string): readonly string[] {
   }
   return (block[1] ?? '')
     .split('\n')
-    .map((line) => line.replace(/^\s*-\s*/, '').trim().replace(/^['"]|['"]$/g, ''))
+    .map((line) =>
+      line
+        .replace(/^\s*-\s*/, '')
+        .trim()
+        .replace(/^['"]|['"]$/g, ''),
+    )
     .filter((line) => line.length > 0)
 }
 
@@ -83,10 +88,7 @@ test.describe('Gateway cross-origin policy @story:13652 @component:pacco-web-log
 
     // And the four files agree with one another, not merely with the client.
     const distinct = new Set(policies.map((policy) => policy.origins.join('|')))
-    expect(
-      distinct.size,
-      `the four files disagree: ${[...distinct].join(' / ')}`,
-    ).toBe(1)
+    expect(distinct.size, `the four files disagree: ${[...distinct].join(' / ')}`).toBe(1)
   })
 
   test('TC-13652-045 Verify that a browser request from the allowed origin is accepted and echoed @live @layer:api @ac:AC-16 @intent:smoke', async ({
@@ -189,10 +191,9 @@ test.describe('Gateway cross-origin policy @story:13652 @component:pacco-web-log
           .filter((line) => !/allowedOrigins|^\s*-\s*https?:\/\//.test(line))
           .join('\n')
 
-      expect(
-        strip(current ?? ''),
-        `${fileName} changed outside the allowed-origin key`,
-      ).toBe(strip(baseline))
+      expect(strip(current ?? ''), `${fileName} changed outside the allowed-origin key`).toBe(
+        strip(baseline),
+      )
 
       // And the one key that did change moved from a wildcard to the client.
       expect(allowedOrigins(current ?? '')).toEqual([env.webBaseUrl])
