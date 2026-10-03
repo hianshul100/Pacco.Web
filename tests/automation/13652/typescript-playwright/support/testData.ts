@@ -1,0 +1,285 @@
+/**
+ * Data sets transcribed from the CSV's "Test Data" column.
+ *
+ * Kept in one place so a row's inputs are visible next to the expectation they
+ * drive, and so the same nine role values used by TC-056 are demonstrably the
+ * same nine used by TC-025 and TC-026.
+ */
+import { LANDING_COPY } from './expectedCopy'
+
+// ---------------------------------------------------------------------------
+// Roles
+// ---------------------------------------------------------------------------
+
+export interface RoleCase {
+  /** The role exactly as the platform returns it. */
+  readonly returned: string
+  /** What the client must store: the returned value, lower-cased, verbatim. */
+  readonly stored: string
+  /** The heading the landing screen must show. */
+  readonly heading: string
+  /** Whether this role is the recognised administrator. */
+  readonly isAdmin: boolean
+}
+
+function roleCase(returned: string): RoleCase {
+  const stored = returned.toLowerCase()
+  const isAdmin = stored === 'admin'
+  return {
+    returned,
+    stored,
+    heading: isAdmin ? LANDING_COPY.adminHeading : LANDING_COPY.standardHeading,
+    isAdmin,
+  }
+}
+
+/** TC-025: mixed-case variants that must normalise to two stored values. */
+export const CASE_VARIANT_ROLES: readonly RoleCase[] = [
+  'Admin',
+  'ADMIN',
+  'aDmIn',
+  'User',
+  'USER',
+].map(roleCase)
+
+/**
+ * TC-026: roles the platform does not currently issue. They are stored
+ * verbatim (lower-cased) and never substituted for something the client
+ * recognises.
+ */
+export const UNRECOGNISED_ROLES: readonly RoleCase[] = [
+  'administrator',
+  'superuser',
+  'auditor',
+  '',
+].map(roleCase)
+
+/**
+ * TC-056: the nine values whose heading and role indicator must always agree.
+ * Three resolve to the administrator landing, six to the ordinary one.
+ */
+export const ROLE_AGREEMENT_CASES: readonly RoleCase[] = [
+  'admin',
+  'Admin',
+  'ADMIN',
+  'user',
+  'User',
+  'administrator',
+  'superuser',
+  'auditor',
+  '',
+].map(roleCase)
+
+/** TC-052: whitespace-only roles, each of which lands on the ordinary screen. */
+export const WHITESPACE_ROLES: ReadonlyArray<{ readonly label: string; readonly value: string }> = [
+  { label: 'three spaces', value: '   ' },
+  { label: 'a single tab', value: '\t' },
+  { label: 'a single newline', value: '\n' },
+]
+
+/** TC-058: identifiers that merely look administrative and must change nothing. */
+export const ADMIN_SHAPED_LOCAL_PARTS = ['admin', 'administrator', 'admin.user'] as const
+
+// ---------------------------------------------------------------------------
+// Hostile input (TC-098)
+// ---------------------------------------------------------------------------
+
+export interface HostilePayload {
+  readonly label: string
+  readonly value: string
+  /** A distinctive fragment to sweep the rendered page for. */
+  readonly needle: string
+}
+
+export const HOSTILE_PAYLOADS: readonly HostilePayload[] = [
+  {
+    label: 'a script tag',
+    value: '<script>window.__pacco13652Xss__ = true</script>',
+    needle: '__pacco13652Xss__',
+  },
+  {
+    label: 'an image with an error handler',
+    value: '<img src=x onerror="window.__pacco13652Xss__ = true">',
+    needle: 'onerror',
+  },
+  {
+    label: 'a hundred thousand characters',
+    value: 'A'.repeat(100_000),
+    needle: 'A'.repeat(200),
+  },
+  {
+    label: 'emoji and right-to-left marks',
+    // Written as escapes, not as the characters themselves: a literal
+    // right-to-left override reverses the rest of this file in every editor
+    // and review tool that renders it.
+    value: '\u{1F69A}\u202Eemocleb\u202C\u200F pacco',
+    needle: '\u202E',
+  },
+  {
+    label: 'control and null characters',
+    // Escapes again, and for a harder reason: an embedded NUL makes git
+    // classify this source file as binary, so it stops producing a diff.
+    value: 'pa\u0000cc\u0007o\u001B[31m',
+    needle: '\u0000',
+  },
+  {
+    label: 'a template expression',
+    value: '${constructor.constructor("return 1")()}',
+    needle: 'constructor.constructor',
+  },
+]
+
+/** The global a successful script injection would define. Must stay undefined. */
+export const XSS_MARKER_GLOBAL = '__pacco13652Xss__'
+
+// ---------------------------------------------------------------------------
+// Whitespace-only credentials (TC-014)
+// ---------------------------------------------------------------------------
+
+export const WHITESPACE_IDENTIFIER = '   '
+export const WHITESPACE_PASSWORD = '\t\t'
+
+// ---------------------------------------------------------------------------
+// Session expiry boundaries (TC-065)
+// ---------------------------------------------------------------------------
+
+export interface ExpiryBoundary {
+  readonly label: string
+  /** Seconds relative to now. */
+  readonly offsetSeconds: number
+  readonly shouldBeLive: boolean
+}
+
+export const EXPIRY_BOUNDARIES: readonly ExpiryBoundary[] = [
+  { label: 'one second in the future', offsetSeconds: 1, shouldBeLive: true },
+  { label: 'exactly now', offsetSeconds: 0, shouldBeLive: false },
+  { label: 'one second in the past', offsetSeconds: -1, shouldBeLive: false },
+]
+
+// ---------------------------------------------------------------------------
+// Viewports (TC-091 … TC-094)
+// ---------------------------------------------------------------------------
+
+export interface ViewportCase {
+  readonly id: string
+  readonly label: string
+  readonly width: number
+  readonly height: number
+}
+
+/**
+ * The four widths the CSV names, narrowest first. 320 is the narrowest width
+ * the product supports; the rest are the mobile, tablet and desktop points the
+ * layout is written against.
+ */
+export const VIEWPORTS: readonly ViewportCase[] = [
+  { id: 'narrowest', label: 'the narrowest supported width', width: 320, height: 568 },
+  { id: 'mobile', label: 'a typical mobile viewport', width: 390, height: 844 },
+  { id: 'tablet', label: 'the tablet breakpoint', width: 768, height: 1024 },
+  { id: 'desktop', label: 'the desktop width', width: 1440, height: 900 },
+]
+
+export function viewportById(id: string): ViewportCase {
+  const found = VIEWPORTS.find((viewport) => viewport.id === id)
+  if (found === undefined) {
+    throw new Error(`no viewport is configured with the id "${id}"`)
+  }
+  return found
+}
+
+// ---------------------------------------------------------------------------
+// Analytics (TC-096, TC-097)
+// ---------------------------------------------------------------------------
+
+/**
+ * The only payload keys sign-in analytics may carry. An allow-list, not a
+ * deny-list: a key nobody anticipated is a failure, which is the point.
+ */
+export const ALLOWED_SIGN_IN_ANALYTICS_KEYS = [
+  'route',
+  'correlationId',
+  'identifierEmpty',
+  'passwordEmpty',
+  'classification',
+] as const
+
+/**
+ * The only payload keys landing analytics may carry.
+ *
+ * `presentation` is the closed two-value decision and `roleRecognised` is a
+ * boolean; the raw role string must never appear. Both are on the list because
+ * `landing.viewed` carries exactly those two and nothing else (TC-118), while
+ * the three denial events carry the route alone.
+ */
+export const ALLOWED_LANDING_ANALYTICS_KEYS = [
+  'route',
+  'correlationId',
+  'presentation',
+  'roleRecognised',
+] as const
+
+/** The two values `presentation` may take. Anything else is a leak or a bug. */
+export const LANDING_PRESENTATIONS = ['admin', 'standard'] as const
+
+/**
+ * The bounded outcome labels `login.failed` may carry, transcribed from
+ * TC-116's Test Data column. A failure recorded as anything else - a backend
+ * code, a status line, a message - fails the row.
+ */
+export const BOUNDED_FAILURE_LABELS = [
+  'invalid_credentials',
+  'unavailable',
+  'malformed',
+  'unexpected',
+] as const
+
+/**
+ * The exact payload keys each event is allowed to carry, by event name
+ * (TC-116, TC-118). Stricter than the flat allow-list above: it catches a key
+ * that is legal on *some* event appearing on one where it is not.
+ */
+export const ANALYTICS_KEYS_BY_EVENT: Readonly<Record<string, readonly string[]>> = {
+  'login.viewed': ['route'],
+  'login.validation_blocked': ['identifierEmpty', 'passwordEmpty'],
+  'login.submitted': ['correlationId'],
+  'login.duplicate_suppressed': ['correlationId'],
+  'login.succeeded': ['correlationId'],
+  'login.failed': ['correlationId', 'classification'],
+  'landing.viewed': ['presentation', 'roleRecognised'],
+  'landing.blocked_unauthenticated': ['route'],
+  'landing.session_expired': ['route'],
+  'landing.logout': ['route'],
+}
+
+// ---------------------------------------------------------------------------
+// Planted administrator signals (TC-114)
+// ---------------------------------------------------------------------------
+
+/**
+ * A second storage key an attacker-controlled page might plant, hoping the
+ * landing screen reads whichever key it finds rather than the one it wrote.
+ * 🚫 Deliberately similar to the real key without being it.
+ */
+export const PLANTED_SESSION_KEY = 'pacco.session.role'
+
+/** The value planted into every one of TC-114's channels. */
+export const PLANTED_ADMIN_VALUE = 'admin'
+
+/**
+ * Values that must never appear in any analytics payload, whatever the key.
+ * The platform's `reason` is on this list because TC-032 forbids it reaching
+ * any client-visible surface, telemetry included.
+ */
+export const FORBIDDEN_ANALYTICS_KEYS = [
+  'password',
+  'passphrase',
+  'identifier',
+  'email',
+  'username',
+  'accessToken',
+  'refreshToken',
+  'token',
+  'code',
+  'reason',
+  'role',
+] as const

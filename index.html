@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <!--
+      Runtime configuration is INJECTED, not embedded in the bundle, per
+      ADR-008 (configuration is injected, not embedded). This file is served
+      verbatim from `public/` so the two keys can be changed without rebuilding
+      the client. The bundle never contains a gateway URL literal.
+    -->
+    <script src="/pacco-config.js"></script>
+    <title>Pacco</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

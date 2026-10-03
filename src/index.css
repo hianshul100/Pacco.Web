@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * ⚠️ APPROXIMATED FOUNDATION. ADR-021 §5 rule 7 names `STYLE_README.md` and
+ * `pacco-material-you.css` as the platform's first authored stylesheet, but
+ * neither file exists anywhere in this workspace
+ * (LOW_LEVEL_SPEC-13652-wave-1.md blocker B3). Everything below is approximated
+ * from the supplied reference image `02_login-page-ux.png` and is recorded as
+ * an approximation in docs/DESIGN_APPROXIMATION.md. It is NOT a stand-in
+ * presented as the approved foundation.
+ */
+
+@layer base {
+  html {
+    /* Keeps 200% zoom usable without a fixed pixel root size. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-surface-muted font-sans text-ink-700 antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  /* WCAG 2.1 AA 2.4.7 Focus Visible -- one visible indicator everywhere. */
+  :focus-visible {
+    outline: 3px solid theme('colors.brand.500');
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  .pacco-page-gradient {
+    /* The reference's field is an almost-flat cool white that cools very
+       slightly toward the lower right; an earlier, more saturated ramp read as
+       a blue wash the reference does not have. */
+    background-image: linear-gradient(160deg, #fafcff 0%, #f6f9fe 50%, #f0f6fd 100%);
+  }
+}

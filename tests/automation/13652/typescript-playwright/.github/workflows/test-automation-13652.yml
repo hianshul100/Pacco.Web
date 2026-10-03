@@ -1,0 +1,285 @@
+# ---------------------------------------------------------------------------
+# CI pipeline for the JIRA 13652 Playwright suite.
+#
+# GitHub Actions only reads workflows from `.github/workflows/` at the
+# REPOSITORY ROOT. This file lives with the suite it belongs to; copy it up one
+# level to activate it (see README.md, "Enabling CI"):
+#
+#   cp tests/automation/13652/typescript-playwright/.github/workflows/\
+# test-automation-13652.yml .github/workflows/
+#
+# Gate order: secret scan -> lint -> format -> typecheck -> offline tests.
+# The @live project is a separate, manually dispatched job because it needs the
+# Docker Compose backend and the standalone client both running.
+# ---------------------------------------------------------------------------
+name: test-automation-13652
+
+on:
+  push:
+    branches-ignore:
+      - gh-pages
+    paths:
+      - 'tests/automation/13652/typescript-playwright/**'
+      - 'src/**'
+      - '.github/workflows/test-automation-13652.yml'
+  pull_request:
+    paths:
+      - 'tests/automation/13652/typescript-playwright/**'
+      - 'src/**'
+  workflow_dispatch:
+    inputs:
+      run_live:
+        description: 'Also run the @live project against a local platform'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-automation-13652-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUITE_DIR: tests/automation/13652/typescript-playwright
+  NODE_VERSION: '20.19.0'
+
+jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          # Full history so the scanner can walk every commit on the branch.
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >-
+            detect --source=. --redact --no-banner
+            --report-format=sarif --report-path=gitleaks.sarif
+
+      - name: trufflehog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --results=verified,unknown --fail
+
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+          retention-days: 14
+
+  quality-gates:
+    name: Lint, format, typecheck
+    runs-on: ubuntu-latest
+    needs: secret-scan
+    defaults:
+      run:
+        working-directory: tests/automation/13652/typescript-playwright
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        # `npm ci` only: package-lock.json is committed, so a resolution that
+        # drifts from it must fail the build rather than be silently repaired.
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+  offline-tests:
+    name: Offline suite (static, api, ui, a11y)
+    runs-on: ubuntu-latest
+    needs: quality-gates
+    defaults:
+      run:
+        working-directory: tests/automation/13652/typescript-playwright
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npm run install:browsers
+
+      - name: Build the client under test
+        # The a11y and ui rows need the built bundle for the static scans.
+        working-directory: .
+        run: |
+          npm ci || npm install
+          npm run build
+
+      - name: Serve the standalone client
+        working-directory: .
+        run: |
+          npx vite preview --port 5173 --strict-port &
+          npx --yes wait-on http://localhost:5173 --timeout 120000
+
+      - name: Run the offline projects
+        run: npm run test:offline
+        env:
+          # Fixture values only. Real credentials never enter CI for this suite:
+          # every offline row stubs the edge instead of signing in for real.
+          PACCO_WEB_BASE_URL: http://localhost:5173
+          PACCO_GATEWAY_BASE_URL: http://localhost:5000
+          PACCO_USER_EMAIL: ${{ vars.PACCO_USER_EMAIL }}
+          PACCO_USER_PASSWORD: ${{ secrets.PACCO_USER_PASSWORD }}
+          PACCO_ADMIN_EMAIL: ${{ vars.PACCO_ADMIN_EMAIL }}
+          PACCO_ADMIN_PASSWORD: ${{ secrets.PACCO_ADMIN_PASSWORD }}
+          PACCO_OTHER_EMAIL: ${{ vars.PACCO_OTHER_EMAIL }}
+          PACCO_UNKNOWN_EMAIL: ${{ vars.PACCO_UNKNOWN_EMAIL }}
+          PACCO_UNKNOWN_EMAIL_STUBBED: ${{ vars.PACCO_UNKNOWN_EMAIL_STUBBED }}
+          PACCO_WRONG_PASSWORD: ${{ secrets.PACCO_WRONG_PASSWORD }}
+          PACCO_WRONG_PASSWORD_LIVE: ${{ secrets.PACCO_WRONG_PASSWORD_LIVE }}
+          # A distinct wrong passphrase per attempt for TC-119.
+          PACCO_WRONG_PASSWORD_SEQUENCE: ${{ secrets.PACCO_WRONG_PASSWORD_SEQUENCE }}
+          PACCO_ADMIN_SHAPED_EMAIL: ${{ vars.PACCO_ADMIN_SHAPED_EMAIL }}
+          PACCO_PASSWORD_CANARY: ${{ vars.PACCO_PASSWORD_CANARY }}
+          PACCO_REFRESH_TOKEN_CANARY: ${{ vars.PACCO_REFRESH_TOKEN_CANARY }}
+          PACCO_REASON_CANARY: ${{ vars.PACCO_REASON_CANARY }}
+          A11Y_WCAG_LEVEL: aa
+          A11Y_FAIL_ON_VIOLATIONS: 'true'
+          LOG_LEVEL: info
+
+      - name: Upload JUnit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-13652
+          path: tests/automation/13652/typescript-playwright/reports/junit/results.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload HTML report and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-13652
+          path: |
+            tests/automation/13652/typescript-playwright/reports/html
+            tests/automation/13652/typescript-playwright/reports/artifacts
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Publish the test summary
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: tests/automation/13652/typescript-playwright/reports/junit/results.xml
+          fail_on_failure: true
+          require_tests: true
+
+  live-tests:
+    name: Live platform suite
+    runs-on: ubuntu-latest
+    needs: quality-gates
+    if: github.event_name == 'workflow_dispatch' && inputs.run_live
+    defaults:
+      run:
+        working-directory: tests/automation/13652/typescript-playwright
+    steps:
+      - name: Check out the client
+        uses: actions/checkout@v4
+
+      - name: Check out the platform
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.PACCO_PLATFORM_REPO }}
+          path: .platform
+
+      - name: Check out the gateway
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.PACCO_GATEWAY_REPO }}
+          path: .gateway
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Start the backend stack
+        working-directory: .platform/compose
+        run: |
+          docker compose -f infrastructure.yml -f services.yml up -d
+          docker compose -f infrastructure.yml -f services.yml ps
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm run install:browsers
+
+      - name: Start the standalone client
+        working-directory: .
+        run: |
+          npm ci || npm install
+          npm run build
+          npx vite preview --port 5173 --strict-port &
+          npx --yes wait-on http://localhost:5173 http://localhost:5000 --timeout 300000
+
+      - name: Run the live project
+        run: npm run test:live
+        env:
+          PACCO_WEB_BASE_URL: http://localhost:5173
+          PACCO_GATEWAY_BASE_URL: http://localhost:5000
+          PACCO_COMPOSE_DIR: ${{ github.workspace }}/.platform/compose
+          PACCO_GATEWAY_CONFIG_DIR: ${{ github.workspace }}/.gateway/src/Pacco.APIGateway
+          PACCO_USER_EMAIL: ${{ vars.PACCO_USER_EMAIL }}
+          PACCO_USER_PASSWORD: ${{ secrets.PACCO_USER_PASSWORD }}
+          PACCO_ADMIN_EMAIL: ${{ vars.PACCO_ADMIN_EMAIL }}
+          PACCO_ADMIN_PASSWORD: ${{ secrets.PACCO_ADMIN_PASSWORD }}
+          PACCO_OTHER_EMAIL: ${{ vars.PACCO_OTHER_EMAIL }}
+          PACCO_UNKNOWN_EMAIL: ${{ vars.PACCO_UNKNOWN_EMAIL }}
+          PACCO_UNKNOWN_EMAIL_STUBBED: ${{ vars.PACCO_UNKNOWN_EMAIL_STUBBED }}
+          PACCO_WRONG_PASSWORD: ${{ secrets.PACCO_WRONG_PASSWORD }}
+          PACCO_WRONG_PASSWORD_LIVE: ${{ secrets.PACCO_WRONG_PASSWORD_LIVE }}
+          # A distinct wrong passphrase per attempt for TC-119.
+          PACCO_WRONG_PASSWORD_SEQUENCE: ${{ secrets.PACCO_WRONG_PASSWORD_SEQUENCE }}
+          PACCO_ADMIN_SHAPED_EMAIL: ${{ vars.PACCO_ADMIN_SHAPED_EMAIL }}
+          PACCO_PASSWORD_CANARY: ${{ vars.PACCO_PASSWORD_CANARY }}
+          PACCO_REFRESH_TOKEN_CANARY: ${{ vars.PACCO_REFRESH_TOKEN_CANARY }}
+          PACCO_REASON_CANARY: ${{ vars.PACCO_REASON_CANARY }}
+
+      - name: Tear the backend stack down
+        if: always()
+        working-directory: .platform/compose
+        run: docker compose -f infrastructure.yml -f services.yml down -v
+
+      - name: Upload live results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-13652-live
+          path: |
+            tests/automation/13652/typescript-playwright/reports/html
+            tests/automation/13652/typescript-playwright/reports/junit
+          if-no-files-found: warn
+          retention-days: 14
